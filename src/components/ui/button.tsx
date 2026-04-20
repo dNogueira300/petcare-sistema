@@ -4,7 +4,7 @@ import { forwardRef } from "react";
 import { cn } from "@/lib/utils";
 
 type Variant = "primary" | "secondary" | "danger" | "ghost" | "outline";
-type Size = "sm" | "md" | "lg";
+type Size    = "sm" | "md" | "lg";
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
@@ -12,57 +12,52 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   loading?: boolean;
 }
 
+const base =
+  "inline-flex items-center justify-center gap-2 rounded-[9px] font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer select-none";
+
 const variants: Record<Variant, string> = {
   primary:
-    "bg-petcare-600 text-white hover:bg-petcare-700 active:bg-petcare-800 shadow-sm",
+    "bg-forest-900 text-cream-300 hover:bg-forest-800 active:bg-forest-700 shadow-sm hover:shadow-md focus-visible:ring-forest-400",
   secondary:
-    "bg-petcare-100 text-petcare-800 hover:bg-petcare-200 active:bg-petcare-300",
+    "bg-cream-200 text-cream-900 hover:bg-cream-300 active:bg-cream-400 focus-visible:ring-cream-500",
   danger:
-    "bg-red-600 text-white hover:bg-red-700 active:bg-red-800 shadow-sm",
+    "bg-red-600 text-white hover:bg-red-700 active:bg-red-800 shadow-sm focus-visible:ring-red-400",
   ghost:
-    "text-petcare-700 hover:bg-petcare-50 active:bg-petcare-100",
+    "text-cream-700 hover:bg-cream-200 active:bg-cream-300 focus-visible:ring-cream-400",
   outline:
-    "border border-petcare-600 text-petcare-600 hover:bg-petcare-50 active:bg-petcare-100",
+    "border border-cream-400 text-cream-800 hover:bg-cream-100 active:bg-cream-200 focus-visible:ring-cream-400",
 };
 
 const sizes: Record<Size, string> = {
-  sm: "h-8 px-3 text-sm",
-  md: "h-10 px-4 text-sm",
-  lg: "h-12 px-6 text-base",
+  sm: "h-8 px-3 text-xs",
+  md: "h-9 px-4 text-sm",
+  lg: "h-11 px-5 text-sm",
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  (
-    {
-      variant = "primary",
-      size = "md",
-      loading = false,
-      disabled,
-      className,
-      children,
-      ...props
-    },
-    ref
-  ) => {
-    return (
-      <button
-        ref={ref}
-        disabled={disabled || loading}
-        className={cn(
-          "inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petcare-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer",
-          variants[variant],
-          sizes[size],
-          className
-        )}
-        {...props}
-      >
-        {loading && (
-          <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-        )}
-        {children}
-      </button>
-    );
-  }
+  ({ variant = "primary", size = "md", loading, disabled, className, children, ...props }, ref) => (
+    <button
+      ref={ref}
+      disabled={disabled || loading}
+      className={cn(base, variants[variant], sizes[size], className)}
+      style={{ fontFamily: "var(--font-dm-sans)", letterSpacing: "0.01em" }}
+      {...props}
+    >
+      {loading && (
+        <span
+          style={{
+            width: "13px", height: "13px",
+            border: "2px solid currentColor",
+            borderTopColor: "transparent",
+            borderRadius: "50%",
+            display: "inline-block",
+            animation: "spin 0.7s linear infinite",
+            flexShrink: 0,
+          }}
+        />
+      )}
+      {children}
+    </button>
+  ),
 );
-
 Button.displayName = "Button";

@@ -1,8 +1,46 @@
 @import "tailwindcss";
 
 @theme {
-  /* PetCare brand palette (green) */
-  --color-petcare-50: #f0fdf4;
+  /* ── Selva Clínica — Forest palette ── */
+  --color-forest-950: #050e0a;
+  --color-forest-900: #0a1a11;
+  --color-forest-800: #0f2318;
+  --color-forest-700: #162e20;
+  --color-forest-600: #1e3d2a;
+  --color-forest-500: #285238;
+  --color-forest-400: #346848;
+  --color-forest-300: #3d845b;
+  --color-forest-200: #55a876;
+  --color-forest-100: #80cc9c;
+  --color-forest-50:  #c0edce;
+
+  /* ── Warm cream ── */
+  --color-cream-950: #2a2118;
+  --color-cream-900: #4a3d2e;
+  --color-cream-800: #6b5c44;
+  --color-cream-700: #8a7a60;
+  --color-cream-600: #a89a80;
+  --color-cream-500: #c4b89c;
+  --color-cream-400: #d9cfba;
+  --color-cream-300: #e8e0d0;
+  --color-cream-200: #f0ead8;
+  --color-cream-100: #f6f1e6;
+  --color-cream-50:  #faf6ef;
+
+  /* ── Gold accent ── */
+  --color-gold-900: #4a2e08;
+  --color-gold-800: #6e450f;
+  --color-gold-700: #8f5e18;
+  --color-gold-600: #ad7625;
+  --color-gold-500: #c48c34;
+  --color-gold-400: #d4a04a;
+  --color-gold-300: #e2b566;
+  --color-gold-200: #edca8a;
+  --color-gold-100: #f5ddb0;
+  --color-gold-50:  #fcefd4;
+
+  /* ── Legacy petcare aliases (keep for badge component) ── */
+  --color-petcare-50:  #f0fdf4;
   --color-petcare-100: #dcfce7;
   --color-petcare-200: #bbf7d0;
   --color-petcare-300: #86efac;
@@ -13,22 +51,70 @@
   --color-petcare-800: #166534;
   --color-petcare-900: #14532d;
 
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans), "Inter", system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-fraunces), "Georgia", serif;
+  --font-sans:    var(--font-dm-sans), "Helvetica Neue", sans-serif;
+  --font-mono:    "JetBrains Mono", ui-monospace, monospace;
+
+  --color-background: var(--bg);
+  --color-foreground: var(--fg);
 }
 
+/* ── Global tokens ── */
 :root {
-  --color-primary: #16a34a;
-  --color-primary-dark: #15803d;
-  --color-primary-light: #dcfce7;
-  --background: #f9fafb;
-  --foreground: #111827;
+  --bg:              #f5f0e8;
+  --fg:              #1a1208;
+  --sidebar-bg:      #0a1a11;
+  --sidebar-fg:      #c4b89c;
+  --sidebar-accent:  #3d845b;
+  --card-bg:         #ffffff;
+  --card-border:     #e4dccf;
+  --input-bg:        #fdfaf5;
+  --input-border:    #d0c8b8;
+  --focus-ring:      #c48c34;
+  --radius:          10px;
 }
 
+/* ── Body ── */
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--bg);
+  color: var(--fg);
   font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.6;
 }
+
+/* ── Display headings use Fraunces ── */
+h1, h2, h3, .font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #c4b89c; border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #a89a80; }
+
+/* ── Noise texture overlay on dark surfaces ── */
+.noise::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* ── Staggered fade-in ── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up {
+  animation: fadeUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.delay-1 { animation-delay: 80ms; }
+.delay-2 { animation-delay: 160ms; }
+.delay-3 { animation-delay: 240ms; }
+.delay-4 { animation-delay: 320ms; }
+.delay-5 { animation-delay: 400ms; }
