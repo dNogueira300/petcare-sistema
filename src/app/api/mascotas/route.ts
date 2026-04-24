@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { cookies } from "next/headers";
-import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/server";
 import { getSessionUser } from "@/lib/auth";
 
 const ALLOWED_ROLES = ["administrador", "veterinario", "recepcionista"];
@@ -22,8 +21,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const id_cliente = searchParams.get("id_cliente");
 
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = createAdminClient();
 
   let query = supabase
     .from("mascotas")
@@ -61,10 +59,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
-
-  const { data, error } = await supabase
+  const { data, error } = await createAdminClient()
     .from("mascotas")
     .insert(parsed.data)
     .select()

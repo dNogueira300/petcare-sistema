@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { cookies } from "next/headers";
-import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/server";
 import { hashPassword, getSessionUser } from "@/lib/auth";
+import { passwordSchema } from "@/utils/password";
 
 const createSchema = z.object({
   nombre: z.string().min(2),
   apellido: z.string().min(2),
   correo: z.string().email(),
-  contrasena: z.string().min(8),
-  rol: z.enum(["administrador", "veterinario", "recepcionista", "cliente"]),
+  contrasena: passwordSchema,
+  rol: z.enum(["administrador", "veterinario", "recepcionista"]),
 });
 
 export async function GET() {
@@ -18,12 +18,10 @@ export async function GET() {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
-
-  const { data, error } = await supabase
+  const { data, error } = await createAdminClient()
     .from("usuarios")
     .select("id_usuario, nombre, apellido, correo, rol, activo, creado_en")
+    .not("rol", "eq", "cliente")
     .order("creado_en", { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -45,8 +43,7 @@ export async function POST(req: NextRequest) {
   const { contrasena, ...rest } = parsed.data;
   const contrasena_hash = await hashPassword(contrasena);
 
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = createAdminClient();
 
   const { data, error } = await supabase
     .from("usuarios")
@@ -59,6 +56,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "El correo ya está registrado" }, { status: 409 });
     }
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  if (data.rol === "veterinario") {
+    await supabase
+      .from("veterinarios")
+      .insert({ id_usuario: data.id_usuario, horario_inicio: "07:00", horario_fin: "20:00" });
   }
 
   return NextResponse.json({ data }, { status: 201 });

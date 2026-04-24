@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { cookies } from "next/headers";
-import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/server";
 import { getSessionUser } from "@/lib/auth";
 
 const updateSchema = z.object({
@@ -19,10 +18,8 @@ export async function GET(_req: NextRequest, { params }: Params) {
   if (!session) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
 
   const { id } = await params;
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
 
-  const { data, error } = await supabase
+  const { data, error } = await createAdminClient()
     .from("mascotas")
     .select(
       "*, clientes(id_cliente, usuarios(nombre, apellido)), historia_clinica(id_historia, fecha_consulta, diagnostico, tratamiento)"
@@ -47,10 +44,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
-
-  const { data, error } = await supabase
+  const { data, error } = await createAdminClient()
     .from("mascotas")
     .update(parsed.data)
     .eq("id_mascota", id)

@@ -6,19 +6,28 @@ import { z } from "zod";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { passwordSchema, PASSWORD_HINT } from "@/utils/password";
 
-const schema = z.object({
+const baseFields = {
   nombre: z.string().min(2, "Mínimo 2 caracteres"),
   apellido: z.string().min(2, "Mínimo 2 caracteres"),
   correo: z.string().email("Correo inválido"),
-  contrasena: z.string().min(8, "Mínimo 8 caracteres").optional().or(z.literal("")),
-  rol: z.enum(["administrador", "veterinario", "recepcionista", "cliente"]),
+  rol: z.enum(["administrador", "veterinario", "recepcionista"]),
+};
+
+const createSchema = z.object({
+  ...baseFields,
+  contrasena: passwordSchema,
 });
 
-type FormData = z.infer<typeof schema>;
+const editSchema = z.object(baseFields);
+
+type CreateData = z.infer<typeof createSchema>;
+type EditData = z.infer<typeof editSchema>;
+type FormData = CreateData | EditData;
 
 interface UsuarioFormProps {
-  defaultValues?: Partial<FormData>;
+  defaultValues?: Partial<CreateData>;
   onSubmit: (data: FormData) => Promise<void>;
   isEdit?: boolean;
 }
@@ -27,35 +36,39 @@ const rolOptions = [
   { value: "administrador", label: "Administrador" },
   { value: "veterinario", label: "Veterinario" },
   { value: "recepcionista", label: "Recepcionista" },
-  { value: "cliente", label: "Cliente" },
 ];
 
 export function UsuarioForm({ defaultValues, onSubmit, isEdit }: UsuarioFormProps) {
+  const schema = isEdit ? editSchema : createSchema;
+
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<FormData>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(schema as z.ZodType<FormData>),
     defaultValues,
   });
+
+  const e = errors as Record<string, { message?: string }>;
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-4">
-        <Input label="Nombre" error={errors.nombre?.message} {...register("nombre")} />
-        <Input label="Apellido" error={errors.apellido?.message} {...register("apellido")} />
+        <Input label="Nombre" error={e.nombre?.message} {...register("nombre")} />
+        <Input label="Apellido" error={e.apellido?.message} {...register("apellido")} />
       </div>
-      <Input label="Correo" type="email" error={errors.correo?.message} {...register("correo")} />
+      <Input label="Correo" type="email" error={e.correo?.message} {...register("correo")} />
       {!isEdit && (
         <Input
           label="Contraseña"
           type="password"
-          error={errors.contrasena?.message}
-          {...register("contrasena")}
+          hint={PASSWORD_HINT}
+          error={e.contrasena?.message}
+          {...register("contrasena" as never)}
         />
       )}
-      <Select label="Rol" options={rolOptions} error={errors.rol?.message} {...register("rol")} />
+      <Select label="Rol" options={rolOptions} error={e.rol?.message} {...register("rol")} />
       <Button type="submit" loading={isSubmitting} className="mt-2">
         {isEdit ? "Guardar cambios" : "Crear usuario"}
       </Button>

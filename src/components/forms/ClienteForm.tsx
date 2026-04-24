@@ -5,12 +5,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { passwordSchema, PASSWORD_HINT } from "@/utils/password";
 
 const schema = z.object({
   nombre: z.string().min(2, "Mínimo 2 caracteres"),
   apellido: z.string().min(2, "Mínimo 2 caracteres"),
   correo: z.string().email("Correo inválido"),
-  contrasena: z.string().min(8, "Mínimo 8 caracteres"),
+  contrasena: passwordSchema,
   telefono: z.string().min(7, "Teléfono inválido"),
   direccion: z.string().optional(),
 });
@@ -38,6 +39,7 @@ export function ClienteForm({ onSubmit }: ClienteFormProps) {
       <Input
         label="Contraseña"
         type="password"
+        hint={PASSWORD_HINT}
         error={errors.contrasena?.message}
         {...register("contrasena")}
       />

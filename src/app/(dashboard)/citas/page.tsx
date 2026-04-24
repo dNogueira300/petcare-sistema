@@ -1,15 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { CalendarPlus } from "lucide-react";
+import { CalendarPlus, Pencil } from "lucide-react";
 import { Table, type Column } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Alert } from "@/components/ui/alert";
 import { Select } from "@/components/ui/select";
-import { formatLima } from "@/utils/datetime";
+import { Modal } from "@/components/ui/modal";
+import { CitaForm } from "@/components/forms/CitaForm";
+import { formatLima, hoyCimaFecha, slotsDisponibles } from "@/utils/datetime";
 import type { EstadoCita } from "@/types";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/context/toast";
 
 interface CitaRow {
   id_cita: number;
@@ -17,13 +19,8 @@ interface CitaRow {
   hora: string;
   motivo: string;
   estado: EstadoCita;
-  mascotas: {
-    nombre: string;
-    especie: string;
-  };
-  veterinarios: {
-    usuarios: { nombre: string; apellido: string };
-  };
+  mascotas: { nombre: string; especie: string };
+  veterinarios: { usuarios: { nombre: string; apellido: string } };
 }
 
 const estadoLabels: Record<EstadoCita, string> = {
@@ -41,11 +38,92 @@ const estadoOptions = [
   { value: "atendida", label: "Atendida" },
 ];
 
+function EditCitaForm({
+  cita,
+  onSubmit,
+}: {
+  cita: CitaRow;
+  onSubmit: (fecha: string, hora: string) => Promise<void>;
+}) {
+  const [fecha, setFecha] = useState(cita.fecha);
+  const [hora, setHora] = useState(cita.hora.slice(0, 5));
+  const [submitting, setSubmitting] = useState(false);
+
+  const slots = fecha ? slotsDisponibles(fecha) : [];
+  const esDomingo = slots.length === 0 && !!fecha;
+
+  // Reset hora when fecha changes and current hora is not in new slots
+  useEffect(() => {
+    if (slots.length > 0 && !slots.includes(hora)) setHora("");
+  }, [fecha]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!hora) return;
+    setSubmitting(true);
+    await onSubmit(fecha, hora);
+    setSubmitting(false);
+  };
+
+  const horaOptions = slots.map((h) => ({ value: h, label: h }));
+
+  return (
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">Veterinario</p>
+        <p className="text-sm text-gray-900">
+          {cita.veterinarios.usuarios.nombre} {cita.veterinarios.usuarios.apellido}
+        </p>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Fecha</label>
+          <input
+            type="date"
+            value={fecha}
+            min={hoyCimaFecha()}
+            onChange={(e) => setFecha(e.target.value)}
+            required
+            className="h-10 rounded-[9px] border border-gray-200 px-3 text-sm focus:border-petcare-500 focus:outline-none focus:ring-2 focus:ring-petcare-100"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Hora</label>
+          <select
+            value={hora}
+            onChange={(e) => setHora(e.target.value)}
+            required
+            disabled={!fecha || esDomingo}
+            className="h-10 rounded-[9px] border border-gray-200 px-3 text-sm focus:border-petcare-500 focus:outline-none focus:ring-2 focus:ring-petcare-100 disabled:opacity-50"
+          >
+            <option value="">
+              {!fecha ? "Selecciona fecha primero" : esDomingo ? "Sin atención los domingos" : "Seleccionar hora…"}
+            </option>
+            {horaOptions.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+      {esDomingo && (
+        <p className="text-sm text-amber-600">Los domingos no hay atención. Selecciona otro día.</p>
+      )}
+      <Button type="submit" loading={submitting} disabled={!hora} className="mt-2">
+        Guardar cambios
+      </Button>
+    </form>
+  );
+}
+
 export default function CitasPage() {
   const [citas, setCitas] = useState<CitaRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [estadoFilter, setEstadoFilter] = useState("");
-  const [alert, setAlert] = useState<{ type: "success" | "error"; msg: string } | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editItem, setEditItem] = useState<CitaRow | null>(null);
+  const { user } = useAuth();
+  const canEdit = user?.rol === "administrador" || user?.rol === "recepcionista";
+  const toast = useToast();
 
   const fetchCitas = async (estado = "") => {
     setLoading(true);
@@ -58,6 +136,39 @@ export default function CitasPage() {
 
   useEffect(() => { fetchCitas(estadoFilter); }, [estadoFilter]);
 
+  const handleCreate = async (data: Record<string, unknown>) => {
+    const res = await fetch("/api/citas", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    if (res.ok) {
+      setCreateOpen(false);
+      toast.success("Cita agendada correctamente");
+      fetchCitas(estadoFilter);
+    } else {
+      const json = await res.json();
+      toast.error(json.error ?? "Error al agendar la cita");
+    }
+  };
+
+  const handleEdit = async (fecha: string, hora: string) => {
+    if (!editItem) return;
+    const res = await fetch(`/api/citas/${editItem.id_cita}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fecha, hora }),
+    });
+    if (res.ok) {
+      setEditItem(null);
+      toast.success("Cita actualizada");
+      fetchCitas(estadoFilter);
+    } else {
+      const json = await res.json();
+      toast.error(json.error ?? "Error al actualizar la cita");
+    }
+  };
+
   const cambiarEstado = async (id: number, estado: EstadoCita) => {
     const res = await fetch(`/api/citas/${id}`, {
       method: "PATCH",
@@ -65,7 +176,7 @@ export default function CitasPage() {
       body: JSON.stringify({ estado }),
     });
     if (res.ok) {
-      setAlert({ type: "success", msg: "Estado actualizado" });
+      toast.success("Estado actualizado");
       fetchCitas(estadoFilter);
     }
   };
@@ -74,13 +185,9 @@ export default function CitasPage() {
     {
       key: "fecha",
       header: "Fecha",
-      render: (c) => formatLima(`${c.fecha}T${c.hora}:00`, "dd/MM/yyyy"),
+      render: (c) => formatLima(`${c.fecha}T00:00:00`, "dd/MM/yyyy"),
     },
-    {
-      key: "hora",
-      header: "Hora",
-      render: (c) => c.hora,
-    },
+    { key: "hora", header: "Hora", render: (c) => c.hora.slice(0, 5) },
     {
       key: "mascota",
       header: "Mascota",
@@ -89,24 +196,30 @@ export default function CitasPage() {
     {
       key: "veterinario",
       header: "Veterinario",
-      render: (c) =>
-        c.veterinarios
-          ? `${c.veterinarios.usuarios.nombre} ${c.veterinarios.usuarios.apellido}`
-          : "—",
+      render: (c) => c.veterinarios
+        ? `${c.veterinarios.usuarios.nombre} ${c.veterinarios.usuarios.apellido}`
+        : "—",
     },
     { key: "motivo", header: "Motivo" },
     {
       key: "estado",
       header: "Estado",
-      render: (c) => (
-        <Badge variant={c.estado}>{estadoLabels[c.estado]}</Badge>
-      ),
+      render: (c) => <Badge variant={c.estado}>{estadoLabels[c.estado]}</Badge>,
     },
     {
       key: "acciones",
-      header: "",
+      header: "Acciones",
       render: (c) => (
-        <div className="flex gap-1">
+        <div className="flex items-center gap-1">
+          {canEdit && c.estado !== "cancelada" && c.estado !== "atendida" && (
+            <button
+              onClick={() => setEditItem(c)}
+              title="Editar fecha/hora"
+              className="rounded-lg p-1.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+            >
+              <Pencil className="size-4" />
+            </button>
+          )}
           {c.estado === "pendiente" && (
             <button
               onClick={() => cambiarEstado(c.id_cita, "confirmada")}
@@ -143,12 +256,10 @@ export default function CitasPage() {
           <h1 className="text-2xl font-bold text-gray-900">Citas</h1>
           <p className="text-sm text-gray-500">Agenda de consultas veterinarias</p>
         </div>
-        <Link href="/citas/nueva">
-          <Button>
-            <CalendarPlus className="size-4" />
-            Nueva cita
-          </Button>
-        </Link>
+        <Button onClick={() => setCreateOpen(true)}>
+          <CalendarPlus className="size-4" />
+          Nueva cita
+        </Button>
       </div>
 
       <div className="w-48">
@@ -159,10 +270,6 @@ export default function CitasPage() {
         />
       </div>
 
-      {alert && (
-        <Alert variant={alert.type} message={alert.msg} onClose={() => setAlert(null)} />
-      )}
-
       <Table
         columns={columns}
         data={citas}
@@ -170,6 +277,14 @@ export default function CitasPage() {
         loading={loading}
         emptyMessage="No hay citas registradas"
       />
+
+      <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Nueva cita">
+        <CitaForm onSubmit={handleCreate} />
+      </Modal>
+
+      <Modal open={!!editItem} onClose={() => setEditItem(null)} title="Editar cita">
+        {editItem && <EditCitaForm cita={editItem} onSubmit={handleEdit} />}
+      </Modal>
     </div>
   );
 }

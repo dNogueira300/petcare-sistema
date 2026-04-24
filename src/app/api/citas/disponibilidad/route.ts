@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/server";
 import { getSessionUser } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
@@ -16,10 +15,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Parámetros incompletos" }, { status: 400 });
   }
 
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
-
-  const { data } = await supabase
+  const { data } = await createAdminClient()
     .from("citas")
     .select("id_cita")
     .eq("id_veterinario", id_veterinario)

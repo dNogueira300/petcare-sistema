@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { cookies } from "next/headers";
-import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/server";
 import { hashPassword, getSessionUser } from "@/lib/auth";
+import { passwordSchema } from "@/utils/password";
 
 const createSchema = z.object({
   nombre: z.string().min(2),
   apellido: z.string().min(2),
   correo: z.string().email(),
-  contrasena: z.string().min(8),
+  contrasena: passwordSchema,
   telefono: z.string().min(7),
   direccion: z.string().optional(),
 });
@@ -24,8 +24,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const q = searchParams.get("q") ?? "";
 
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = createAdminClient();
 
   let query = supabase
     .from("clientes")
@@ -60,8 +59,7 @@ export async function POST(req: NextRequest) {
   const { contrasena, telefono, direccion, ...usuarioData } = parsed.data;
   const contrasena_hash = await hashPassword(contrasena);
 
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = createAdminClient();
 
   const { data: usuario, error: uError } = await supabase
     .from("usuarios")

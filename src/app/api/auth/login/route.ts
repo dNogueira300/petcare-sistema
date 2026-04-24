@@ -5,56 +5,72 @@ import { cookies } from "next/headers";
 
 const schema = z.object({
   correo: z.string().email(),
-  contrasena: z.string().min(8),
+  contrasena: z.string().min(6),
 });
 
 const attempts = new Map<string, { count: number; until: number }>();
 
 export async function POST(req: NextRequest) {
-  const body = await req.json();
-  const parsed = schema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });
-  }
+  try {
+    const body = await req.json();
+    const parsed = schema.safeParse(body);
 
-  const { correo, contrasena } = parsed.data;
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Correo o contraseña inválidos" },
+        { status: 400 },
+      );
+    }
 
-  const record = attempts.get(correo);
-  if (record && record.count >= 5 && Date.now() < record.until) {
-    return NextResponse.json(
-      { error: "Cuenta bloqueada temporalmente. Intenta en 15 minutos." },
-      { status: 423 }
+    const { correo, contrasena } = parsed.data;
+
+    const record = attempts.get(correo);
+    if (record && record.count >= 5 && Date.now() < record.until) {
+      return NextResponse.json(
+        { error: "Cuenta bloqueada temporalmente. Intenta en 15 minutos." },
+        { status: 423 },
+      );
+    }
+
+    const usuario = await verifyCredentials(correo, contrasena);
+
+    if (!usuario) {
+      const prev = attempts.get(correo) ?? { count: 0, until: 0 };
+      const count = prev.count + 1;
+      attempts.set(correo, {
+        count,
+        until: count >= 5 ? Date.now() + 15 * 60 * 1000 : 0,
+      });
+      console.log(`[AUTH] Login failed for ${correo}. Attempts: ${count}`);
+      return NextResponse.json(
+        { error: "Correo o contraseña incorrectos" },
+        { status: 401 },
+      );
+    }
+
+    attempts.delete(correo);
+
+    // Excluir contrasena_hash de la respuesta por seguridad
+    const { ...safeUser } = usuario;
+    const sessionValue = Buffer.from(JSON.stringify(safeUser)).toString(
+      "base64",
     );
-  }
 
-  const usuario = await verifyCredentials(correo, contrasena);
-
-  if (!usuario) {
-    const prev = attempts.get(correo) ?? { count: 0, until: 0 };
-    const count = prev.count + 1;
-    attempts.set(correo, {
-      count,
-      until: count >= 5 ? Date.now() + 15 * 60 * 1000 : 0,
+    const cookieStore = await cookies();
+    cookieStore.set("session", sessionValue, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 8, // 8 hours
     });
+
+    return NextResponse.json({ user: safeUser });
+  } catch (error) {
+    console.error("[AUTH] Login error:", error);
     return NextResponse.json(
-      { error: "Credenciales incorrectas" },
-      { status: 401 }
+      { error: "Error interno del servidor" },
+      { status: 500 },
     );
   }
-
-  attempts.delete(correo);
-
-  const { contrasena_hash: _, ...safeUser } = usuario;
-  const sessionValue = Buffer.from(JSON.stringify(safeUser)).toString("base64");
-
-  const cookieStore = await cookies();
-  cookieStore.set("session", sessionValue, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 8, // 8 hours
-  });
-
-  return NextResponse.json({ user: safeUser });
 }

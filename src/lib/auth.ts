@@ -5,22 +5,47 @@ import type { Usuario } from "@/types";
 
 export async function verifyCredentials(
   correo: string,
-  contrasena: string
+  contrasena: string,
 ): Promise<Usuario | null> {
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  try {
+    const cookieStore = await cookies();
+    const supabase = createClient(cookieStore);
 
-  const { data: usuario } = await supabase
-    .from("usuarios")
-    .select("*")
-    .eq("correo", correo)
-    .eq("activo", true)
-    .single();
+    // Usa maybeSingle() en lugar de single() para manejar mejor los casos
+    const { data: usuario, error } = await supabase
+      .from("usuarios")
+      .select("*")
+      .eq("correo", correo)
+      .eq("activo", true)
+      .maybeSingle();
 
-  if (!usuario) return null;
+    if (error) {
+      console.error(`[AUTH] Error querying usuario ${correo}:`, error);
+      return null;
+    }
 
-  const valid = await bcrypt.compare(contrasena, usuario.contrasena_hash);
-  return valid ? (usuario as Usuario) : null;
+    if (!usuario) {
+      console.log(`[AUTH] Usuario no encontrado o inactivo para: ${correo}`);
+      return null;
+    }
+
+    console.log(
+      `[AUTH] Usuario encontrado: ${usuario.correo} (id: ${usuario.id_usuario})`,
+    );
+
+    const valid = await bcrypt.compare(contrasena, usuario.contrasena_hash);
+
+    if (!valid) {
+      console.log(`[AUTH] Contraseña inválida para: ${correo}`);
+      return null;
+    }
+
+    console.log(`[AUTH] Login exitoso para: ${correo}`);
+    return usuario as Usuario;
+  } catch (error) {
+    console.error("[AUTH] Error verifying credentials:", error);
+    return null;
+  }
 }
 
 export async function hashPassword(contrasena: string): Promise<string> {

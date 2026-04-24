@@ -1,15 +1,14 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { CitaForm } from "@/components/forms/CitaForm";
-import { Alert } from "@/components/ui/alert";
+import { useToast } from "@/context/toast";
 
 export default function NuevaCitaPage() {
   const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
+  const toast  = useToast();
 
   const handleSubmit = async (data: Record<string, unknown>) => {
     const res = await fetch("/api/citas", {
@@ -18,10 +17,11 @@ export default function NuevaCitaPage() {
       body: JSON.stringify(data),
     });
     if (res.ok) {
+      toast.success("Cita creada correctamente");
       router.push("/citas");
     } else {
       const json = await res.json();
-      setError(json.error ?? "Error al crear la cita");
+      toast.error(json.error ?? "Error al crear la cita");
     }
   };
 
@@ -39,10 +39,6 @@ export default function NuevaCitaPage() {
           <p className="text-sm text-gray-500">Agenda una consulta veterinaria</p>
         </div>
       </div>
-
-      {error && (
-        <Alert variant="error" message={error} onClose={() => setError(null)} />
-      )}
 
       <div className="rounded-xl border border-gray-200 bg-white p-6">
         <CitaForm onSubmit={handleSubmit} />

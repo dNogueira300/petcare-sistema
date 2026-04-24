@@ -9,7 +9,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
-import { hoyCimaFecha } from "@/utils/datetime";
+import { hoyCimaFecha, slotsDisponibles } from "@/utils/datetime";
 
 const schema = z.object({
   id_mascota: z.string().min(1, "Selecciona una mascota"),
@@ -27,19 +27,14 @@ interface CitaFormProps {
 }
 
 interface MascotaOption { id_mascota: number; nombre: string; especie: string }
-interface VetOption { id_veterinario: number; horario_inicio: string; horario_fin: string; usuarios: { nombre: string; apellido: string } }
+interface VetOption { id_veterinario: number; usuarios: { nombre: string; apellido: string } }
 
-function generateHours(inicio: string, fin: string): string[] {
-  const hours: string[] = [];
-  const [sh, sm] = inicio.split(":").map(Number);
-  const [eh, em] = fin.split(":").map(Number);
-  let h = sh, m = sm;
-  while (h < eh || (h === eh && m <= em)) {
-    hours.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
-    m += 30;
-    if (m >= 60) { h++; m -= 60; }
-  }
-  return hours;
+function labelFecha(fecha: string): string | null {
+  if (!fecha) return null;
+  const [y, mo, d] = fecha.split("-").map(Number);
+  const dow = new Date(y, mo - 1, d).getDay();
+  if (dow === 0) return "Los domingos no hay atención";
+  return null;
 }
 
 export function CitaForm({ onSubmit }: CitaFormProps) {
@@ -56,14 +51,18 @@ export function CitaForm({ onSubmit }: CitaFormProps) {
     register,
     handleSubmit,
     watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<FormData>({ resolver: zodResolver(schema) });
 
-  const selectedVetId = watch("id_veterinario");
-  const selectedVet = veterinarios.find((v) => String(v.id_veterinario) === selectedVetId);
-  const horasDisponibles = selectedVet
-    ? generateHours(selectedVet.horario_inicio, selectedVet.horario_fin)
-    : [];
+  const selectedFecha = watch("fecha");
+  const slots = selectedFecha ? slotsDisponibles(selectedFecha) : [];
+  const esDomingo = !!labelFecha(selectedFecha);
+
+  // Limpiar hora al cambiar fecha para evitar selecciones inválidas
+  useEffect(() => {
+    setValue("hora", "");
+  }, [selectedFecha, setValue]);
 
   const submit = async (data: FormData) => {
     setDisponibilidadErr(null);
@@ -72,7 +71,7 @@ export function CitaForm({ onSubmit }: CitaFormProps) {
     );
     const json = await res.json();
     if (!json.disponible) {
-      setDisponibilidadErr("El veterinario no está disponible en ese horario");
+      setDisponibilidadErr("El veterinario ya tiene una cita en ese horario. Elige otra hora.");
       return;
     }
     await onSubmit({
@@ -92,7 +91,13 @@ export function CitaForm({ onSubmit }: CitaFormProps) {
     label: `${v.usuarios.nombre} ${v.usuarios.apellido}`,
   }));
 
-  const horaOptions = horasDisponibles.map((h) => ({ value: h, label: h }));
+  const horaOptions = slots.map((h) => ({ value: h, label: h }));
+
+  const horaPlaceholder = !selectedFecha
+    ? "Selecciona una fecha primero"
+    : esDomingo
+    ? "Sin atención los domingos"
+    : "Seleccionar hora…";
 
   return (
     <form onSubmit={handleSubmit(submit)} className="flex flex-col gap-4">
@@ -121,11 +126,16 @@ export function CitaForm({ onSubmit }: CitaFormProps) {
         <Select
           label="Hora"
           options={horaOptions}
-          placeholder="Seleccionar hora…"
+          placeholder={horaPlaceholder}
           error={errors.hora?.message}
           {...register("hora")}
         />
       </div>
+      {esDomingo && (
+        <p className="text-sm text-amber-600">
+          Los domingos no hay atención. Selecciona otro día.
+        </p>
+      )}
       <Textarea
         label="Motivo"
         placeholder="Describe el motivo de la consulta…"

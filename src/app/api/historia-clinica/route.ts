@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { cookies } from "next/headers";
-import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/server";
 import { getSessionUser } from "@/lib/auth";
 
 const createSchema = z.object({
@@ -24,8 +23,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const id_mascota = searchParams.get("id_mascota");
 
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = createAdminClient();
 
   let query = supabase
     .from("historia_clinica")
@@ -51,30 +49,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  const admin = createAdminClient();
 
-  const { data: cita } = await supabase
+  const { data: cita } = await admin
     .from("citas")
     .select("estado")
     .eq("id_cita", parsed.data.id_cita)
     .single();
 
-  if (!cita || cita.estado !== "atendida") {
-    if (!cita || !["confirmada", "atendida"].includes(cita.estado)) {
-      return NextResponse.json(
-        { error: "Solo se puede crear historia clínica de citas confirmadas o atendidas" },
-        { status: 400 }
-      );
-    }
+  if (!cita || !["confirmada", "atendida"].includes(cita.estado)) {
+    return NextResponse.json(
+      { error: "Solo se puede crear historia clínica de citas confirmadas o atendidas" },
+      { status: 400 }
+    );
   }
 
-  await supabase
+  await admin
     .from("citas")
     .update({ estado: "atendida" })
     .eq("id_cita", parsed.data.id_cita);
 
-  const { data, error } = await supabase
+  const { data, error } = await admin
     .from("historia_clinica")
     .insert(parsed.data)
     .select()

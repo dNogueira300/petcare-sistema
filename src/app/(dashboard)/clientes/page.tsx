@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { UserPlus, Search } from "lucide-react";
+import { UserPlus, Search, Eye, Pencil, ToggleLeft, ToggleRight } from "lucide-react";
 import { Table, type Column } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
-import { Alert } from "@/components/ui/alert";
 import { ClienteForm } from "@/components/forms/ClienteForm";
-import Link from "next/link";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/context/toast";
 
 interface ClienteRow {
   id_cliente: number;
@@ -23,12 +23,67 @@ interface ClienteRow {
   };
 }
 
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-xs font-medium text-gray-500">{label}</span>
+      <span className="text-sm text-gray-900">{value || "—"}</span>
+    </div>
+  );
+}
+
+function EditClienteForm({
+  cliente,
+  onSubmit,
+}: {
+  cliente: ClienteRow;
+  onSubmit: (data: { telefono: string; direccion: string }) => Promise<void>;
+}) {
+  const [telefono, setTelefono] = useState(cliente.telefono);
+  const [direccion, setDireccion] = useState(cliente.direccion ?? "");
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    await onSubmit({ telefono, direccion });
+    setSubmitting(false);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1">
+        <label className="text-sm font-medium text-gray-700">Teléfono</label>
+        <input
+          value={telefono}
+          onChange={(e) => setTelefono(e.target.value)}
+          required
+          className="h-10 rounded-lg border border-gray-300 px-3 text-sm focus:border-petcare-500 focus:outline-none focus:ring-2 focus:ring-petcare-200"
+        />
+      </div>
+      <div className="flex flex-col gap-1">
+        <label className="text-sm font-medium text-gray-700">Dirección</label>
+        <input
+          value={direccion}
+          onChange={(e) => setDireccion(e.target.value)}
+          className="h-10 rounded-lg border border-gray-300 px-3 text-sm focus:border-petcare-500 focus:outline-none focus:ring-2 focus:ring-petcare-200"
+        />
+      </div>
+      <Button type="submit" loading={submitting} className="mt-2">Guardar cambios</Button>
+    </form>
+  );
+}
+
 export default function ClientesPage() {
   const [clientes, setClientes] = useState<ClienteRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [modalOpen, setModalOpen] = useState(false);
-  const [alert, setAlert] = useState<{ type: "success" | "error"; msg: string } | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [detailItem, setDetailItem] = useState<ClienteRow | null>(null);
+  const [editItem, setEditItem] = useState<ClienteRow | null>(null);
+  const { user } = useAuth();
+  const isAdmin = user?.rol === "administrador";
+  const toast = useToast();
 
   const fetchClientes = useCallback(async (q = "") => {
     setLoading(true);
@@ -52,27 +107,46 @@ export default function ClientesPage() {
       body: JSON.stringify(data),
     });
     if (res.ok) {
-      setModalOpen(false);
-      setAlert({ type: "success", msg: "Cliente registrado correctamente" });
+      setCreateOpen(false);
+      toast.success("Cliente registrado correctamente");
       fetchClientes(search);
     } else {
       const json = await res.json();
-      setAlert({ type: "error", msg: json.error ?? "Error al registrar" });
+      toast.error(json.error ?? "Error al registrar");
     }
+  };
+
+  const handleEdit = async (data: { telefono: string; direccion: string }) => {
+    if (!editItem) return;
+    const res = await fetch(`/api/clientes/${editItem.id_cliente}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    if (res.ok) {
+      setEditItem(null);
+      toast.success("Cliente actualizado");
+      fetchClientes(search);
+    } else {
+      const json = await res.json();
+      toast.error(json.error ?? "Error al actualizar");
+    }
+  };
+
+  const toggleActivo = async (c: ClienteRow) => {
+    await fetch(`/api/usuarios/${c.usuarios.id_usuario}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ activo: !c.usuarios.activo }),
+    });
+    fetchClientes(search);
   };
 
   const columns: Column<ClienteRow>[] = [
     {
       key: "nombre",
       header: "Nombre",
-      render: (c) => (
-        <Link
-          href={`/clientes/${c.id_cliente}`}
-          className="font-medium text-petcare-600 hover:underline"
-        >
-          {c.usuarios.nombre} {c.usuarios.apellido}
-        </Link>
-      ),
+      render: (c) => `${c.usuarios.nombre} ${c.usuarios.apellido}`,
     },
     { key: "correo", header: "Correo", render: (c) => c.usuarios.correo },
     { key: "telefono", header: "Teléfono" },
@@ -85,6 +159,41 @@ export default function ClientesPage() {
         </Badge>
       ),
     },
+    {
+      key: "acciones",
+      header: "Acciones",
+      render: (c) => (
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setDetailItem(c)}
+            title="Ver detalle"
+            className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+          >
+            <Eye className="size-4" />
+          </button>
+          {isAdmin && (
+            <>
+              <button
+                onClick={() => setEditItem(c)}
+                title="Editar"
+                className="rounded-lg p-1.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+              >
+                <Pencil className="size-4" />
+              </button>
+              <button
+                onClick={() => toggleActivo(c)}
+                title={c.usuarios.activo ? "Desactivar" : "Activar"}
+                className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 transition-colors"
+              >
+                {c.usuarios.activo
+                  ? <ToggleRight className="size-5 text-petcare-600" />
+                  : <ToggleLeft className="size-5 text-gray-400" />}
+              </button>
+            </>
+          )}
+        </div>
+      ),
+    },
   ];
 
   return (
@@ -94,7 +203,7 @@ export default function ClientesPage() {
           <h1 className="text-2xl font-bold text-gray-900">Clientes</h1>
           <p className="text-sm text-gray-500">Propietarios de mascotas registrados</p>
         </div>
-        <Button onClick={() => setModalOpen(true)}>
+        <Button onClick={() => setCreateOpen(true)}>
           <UserPlus className="size-4" />
           Nuevo cliente
         </Button>
@@ -110,25 +219,29 @@ export default function ClientesPage() {
             className="h-10 w-full rounded-lg border border-gray-300 bg-white pl-9 pr-3 text-sm focus:border-petcare-500 focus:outline-none focus:ring-2 focus:ring-petcare-200"
           />
         </div>
-        <Button type="submit" variant="outline" size="md">
-          Buscar
-        </Button>
+        <Button type="submit" variant="outline" size="md">Buscar</Button>
       </form>
 
-      {alert && (
-        <Alert variant={alert.type} message={alert.msg} onClose={() => setAlert(null)} />
-      )}
+      <Table columns={columns} data={clientes} keyField="id_cliente" loading={loading} emptyMessage="No hay clientes registrados" />
 
-      <Table
-        columns={columns}
-        data={clientes}
-        keyField="id_cliente"
-        loading={loading}
-        emptyMessage="No hay clientes registrados"
-      />
-
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Nuevo cliente">
+      <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Nuevo cliente">
         <ClienteForm onSubmit={handleCreate as never} />
+      </Modal>
+
+      <Modal open={!!detailItem} onClose={() => setDetailItem(null)} title="Detalle del cliente">
+        {detailItem && (
+          <div className="grid grid-cols-2 gap-4">
+            <DetailRow label="Nombre" value={`${detailItem.usuarios.nombre} ${detailItem.usuarios.apellido}`} />
+            <DetailRow label="Correo" value={detailItem.usuarios.correo} />
+            <DetailRow label="Teléfono" value={detailItem.telefono} />
+            <DetailRow label="Dirección" value={detailItem.direccion ?? "—"} />
+            <DetailRow label="Estado" value={detailItem.usuarios.activo ? "Activo" : "Inactivo"} />
+          </div>
+        )}
+      </Modal>
+
+      <Modal open={!!editItem} onClose={() => setEditItem(null)} title="Editar cliente">
+        {editItem && <EditClienteForm cliente={editItem} onSubmit={handleEdit} />}
       </Modal>
     </div>
   );

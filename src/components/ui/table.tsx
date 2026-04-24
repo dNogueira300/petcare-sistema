@@ -2,6 +2,7 @@
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Loading } from "@/components/ui/loading";
 
 export interface Column<T> {
   key: string;
@@ -59,14 +60,8 @@ export function Table<T>({
           <tbody>
             {loading ? (
               <tr>
-                <td
-                  colSpan={columns.length}
-                  className="py-12 text-center text-gray-400"
-                >
-                  <div className="flex items-center justify-center gap-2">
-                    <span className="size-4 animate-spin rounded-full border-2 border-petcare-500 border-t-transparent" />
-                    Cargando...
-                  </div>
+                <td colSpan={columns.length} className="py-12">
+                  <Loading size="lg" text="Cargando..." className="mx-auto" />
                 </td>
               </tr>
             ) : data.length === 0 ? (

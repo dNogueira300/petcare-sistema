@@ -194,7 +194,7 @@ export default function DashboardPage() {
                         fontVariantNumeric: "tabular-nums",
                       }}
                     >
-                      {cita.hora}
+                      {cita.hora.slice(0, 5)}
                     </span>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={{ margin: 0, fontSize: "0.85rem", fontWeight: 600, color: "#1a1208", fontFamily: "var(--font-dm-sans)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>

@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PawPrint } from "lucide-react";
+import { PawPrint, Eye, Pencil } from "lucide-react";
 import { Table, type Column } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
-import { Alert } from "@/components/ui/alert";
 import { MascotaForm } from "@/components/forms/MascotaForm";
+import { useAuth } from "@/hooks/useAuth";
 import { hoyCimaFecha } from "@/utils/datetime";
+import { useToast } from "@/context/toast";
 
 interface MascotaRow {
   id_mascota: number;
@@ -15,6 +16,7 @@ interface MascotaRow {
   especie: string;
   raza: string | null;
   fecha_nacimiento: string | null;
+  peso: number | null;
   clientes: {
     usuarios: { nombre: string; apellido: string };
   };
@@ -27,19 +29,88 @@ function calcEdad(fechaNac: string | null): string {
   const [by, bm, bd] = fechaNac.split("-").map(Number);
   let years = ay - by;
   let months = am - bm;
-  if (months < 0 || (months === 0 && ad < bd)) {
-    years--;
-    months += 12;
-  }
+  if (months < 0 || (months === 0 && ad < bd)) { years--; months += 12; }
   if (years > 0) return `${years} año${years !== 1 ? "s" : ""}`;
   return `${months} mes${months !== 1 ? "es" : ""}`;
+}
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-xs font-medium text-gray-500">{label}</span>
+      <span className="text-sm text-gray-900">{value || "—"}</span>
+    </div>
+  );
+}
+
+const especieOptions = [
+  { value: "Perro", label: "Perro" },
+  { value: "Gato", label: "Gato" },
+  { value: "Ave", label: "Ave" },
+  { value: "Conejo", label: "Conejo" },
+  { value: "Reptil", label: "Reptil" },
+  { value: "Otro", label: "Otro" },
+];
+
+function EditMascotaForm({ mascota, onSubmit }: { mascota: MascotaRow; onSubmit: (d: Record<string, unknown>) => Promise<void> }) {
+  const [nombre, setNombre] = useState(mascota.nombre);
+  const [especie, setEspecie] = useState(mascota.especie);
+  const [raza, setRaza] = useState(mascota.raza ?? "");
+  const [fechaNac, setFechaNac] = useState(mascota.fecha_nacimiento ?? "");
+  const [peso, setPeso] = useState(mascota.peso ? String(mascota.peso) : "");
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    await onSubmit({ nombre, especie, raza: raza || undefined, fecha_nacimiento: fechaNac || undefined, peso: peso ? Number(peso) : undefined });
+    setSubmitting(false);
+  };
+
+  const inputCls = "h-10 rounded-lg border border-gray-300 px-3 text-sm focus:border-petcare-500 focus:outline-none focus:ring-2 focus:ring-petcare-200 w-full";
+
+  return (
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1">
+        <label className="text-sm font-medium text-gray-700">Nombre</label>
+        <input value={nombre} onChange={(e) => setNombre(e.target.value)} required className={inputCls} />
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium text-gray-700">Especie</label>
+          <select value={especie} onChange={(e) => setEspecie(e.target.value)} className={inputCls}>
+            {especieOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium text-gray-700">Raza</label>
+          <input value={raza} onChange={(e) => setRaza(e.target.value)} className={inputCls} />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium text-gray-700">Fecha de nacimiento</label>
+          <input type="date" value={fechaNac} onChange={(e) => setFechaNac(e.target.value)} className={inputCls} />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium text-gray-700">Peso (kg)</label>
+          <input type="number" step="0.01" value={peso} onChange={(e) => setPeso(e.target.value)} className={inputCls} />
+        </div>
+      </div>
+      <Button type="submit" loading={submitting} className="mt-2">Guardar cambios</Button>
+    </form>
+  );
 }
 
 export default function MascotasPage() {
   const [mascotas, setMascotas] = useState<MascotaRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [alert, setAlert] = useState<{ type: "success" | "error"; msg: string } | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [detailItem, setDetailItem] = useState<MascotaRow | null>(null);
+  const [editItem, setEditItem] = useState<MascotaRow | null>(null);
+  const { user } = useAuth();
+  const isAdmin = user?.rol === "administrador";
+  const toast = useToast();
 
   const fetchMascotas = async () => {
     setLoading(true);
@@ -58,12 +129,29 @@ export default function MascotasPage() {
       body: JSON.stringify(data),
     });
     if (res.ok) {
-      setModalOpen(false);
-      setAlert({ type: "success", msg: "Mascota registrada correctamente" });
+      setCreateOpen(false);
+      toast.success("Mascota registrada correctamente");
       fetchMascotas();
     } else {
       const json = await res.json();
-      setAlert({ type: "error", msg: json.error ?? "Error al registrar" });
+      toast.error(json.error ?? "Error al registrar");
+    }
+  };
+
+  const handleEdit = async (data: Record<string, unknown>) => {
+    if (!editItem) return;
+    const res = await fetch(`/api/mascotas/${editItem.id_mascota}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    if (res.ok) {
+      setEditItem(null);
+      toast.success("Mascota actualizada");
+      fetchMascotas();
+    } else {
+      const json = await res.json();
+      toast.error(json.error ?? "Error al actualizar");
     }
   };
 
@@ -74,15 +162,32 @@ export default function MascotasPage() {
     {
       key: "propietario",
       header: "Propietario",
-      render: (m) =>
-        m.clientes
-          ? `${m.clientes.usuarios.nombre} ${m.clientes.usuarios.apellido}`
-          : "—",
+      render: (m) => m.clientes ? `${m.clientes.usuarios.nombre} ${m.clientes.usuarios.apellido}` : "—",
     },
+    { key: "edad", header: "Edad", render: (m) => calcEdad(m.fecha_nacimiento) },
     {
-      key: "edad",
-      header: "Edad",
-      render: (m) => calcEdad(m.fecha_nacimiento),
+      key: "acciones",
+      header: "Acciones",
+      render: (m) => (
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setDetailItem(m)}
+            title="Ver detalle"
+            className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+          >
+            <Eye className="size-4" />
+          </button>
+          {isAdmin && (
+            <button
+              onClick={() => setEditItem(m)}
+              title="Editar"
+              className="rounded-lg p-1.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+            >
+              <Pencil className="size-4" />
+            </button>
+          )}
+        </div>
+      ),
     },
   ];
 
@@ -93,26 +198,34 @@ export default function MascotasPage() {
           <h1 className="text-2xl font-bold text-gray-900">Mascotas</h1>
           <p className="text-sm text-gray-500">Pacientes registrados en la clínica</p>
         </div>
-        <Button onClick={() => setModalOpen(true)}>
+        <Button onClick={() => setCreateOpen(true)}>
           <PawPrint className="size-4" />
           Nueva mascota
         </Button>
       </div>
 
-      {alert && (
-        <Alert variant={alert.type} message={alert.msg} onClose={() => setAlert(null)} />
-      )}
+      <Table columns={columns} data={mascotas} keyField="id_mascota" loading={loading} emptyMessage="No hay mascotas registradas" />
 
-      <Table
-        columns={columns}
-        data={mascotas}
-        keyField="id_mascota"
-        loading={loading}
-        emptyMessage="No hay mascotas registradas"
-      />
-
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Nueva mascota">
+      <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Nueva mascota">
         <MascotaForm onSubmit={handleCreate} />
+      </Modal>
+
+      <Modal open={!!detailItem} onClose={() => setDetailItem(null)} title="Detalle de la mascota">
+        {detailItem && (
+          <div className="grid grid-cols-2 gap-4">
+            <DetailRow label="Nombre" value={detailItem.nombre} />
+            <DetailRow label="Especie" value={detailItem.especie} />
+            <DetailRow label="Raza" value={detailItem.raza ?? "—"} />
+            <DetailRow label="Propietario" value={detailItem.clientes ? `${detailItem.clientes.usuarios.nombre} ${detailItem.clientes.usuarios.apellido}` : "—"} />
+            <DetailRow label="Fecha de nacimiento" value={detailItem.fecha_nacimiento ?? "—"} />
+            <DetailRow label="Peso" value={detailItem.peso ? `${detailItem.peso} kg` : "—"} />
+            <DetailRow label="Edad" value={calcEdad(detailItem.fecha_nacimiento)} />
+          </div>
+        )}
+      </Modal>
+
+      <Modal open={!!editItem} onClose={() => setEditItem(null)} title="Editar mascota">
+        {editItem && <EditMascotaForm mascota={editItem} onSubmit={handleEdit} />}
       </Modal>
     </div>
   );

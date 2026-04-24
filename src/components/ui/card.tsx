@@ -1,9 +1,9 @@
 import { cn } from "@/lib/utils";
 
-export function Card({ className, children, style }: { className?: string; children: React.ReactNode; style?: React.CSSProperties }) {
+export function Card({ className, children, style, interactive }: { className?: string; children: React.ReactNode; style?: React.CSSProperties; interactive?: boolean }) {
   return (
     <div
-      className={cn("rounded-xl", className)}
+      className={cn("rounded-xl", interactive && "card-interactive", className)}
       style={{
         background: "var(--card-bg)",
         border: "1px solid var(--card-border)",

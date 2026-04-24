@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { cookies } from "next/headers";
-import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/server";
 import { getSessionUser } from "@/lib/auth";
-import { hoyCimaFecha } from "@/utils/datetime";
+import { hoyCimaFecha, esDentroDeHorario } from "@/utils/datetime";
 
 const createSchema = z.object({
   id_mascota: z.number().int().positive(),
@@ -25,8 +24,7 @@ export async function GET(req: NextRequest) {
   const id_veterinario = searchParams.get("id_veterinario");
   const estado = searchParams.get("estado");
 
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = createAdminClient();
 
   let query = supabase
     .from("citas")
@@ -79,10 +77,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No se pueden crear citas en fechas pasadas" }, { status: 400 });
   }
 
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  if (!esDentroDeHorario(parsed.data.fecha, parsed.data.hora)) {
+    return NextResponse.json(
+      { error: "El horario seleccionado está fuera del horario de atención (Lun–Vie 7–13h y 15–20h, Sáb 8–15h, Dom cerrado)" },
+      { status: 400 }
+    );
+  }
 
-  const { data: existing } = await supabase
+  const admin = createAdminClient();
+
+  const { data: existing } = await admin
     .from("citas")
     .select("id_cita")
     .eq("id_veterinario", parsed.data.id_veterinario)
@@ -98,7 +102,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await admin
     .from("citas")
     .insert({ ...parsed.data, estado: "pendiente" })
     .select()

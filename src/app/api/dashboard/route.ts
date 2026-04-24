@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/server";
 import { getSessionUser } from "@/lib/auth";
 import { hoyCimaFecha } from "@/utils/datetime";
 
@@ -8,8 +7,7 @@ export async function GET() {
   const session = await getSessionUser();
   if (!session) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
 
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = createAdminClient();
 
   const hoy = hoyCimaFecha();
   const inicioSemana = (() => {
@@ -37,7 +35,7 @@ export async function GET() {
     supabase.from("citas").select("*", { count: "exact", head: true }).eq("estado", "pendiente"),
     supabase.from("clientes").select("*", { count: "exact", head: true }),
     supabase.from("mascotas").select("*", { count: "exact", head: true }),
-    supabase.from("citas").select("estado, especie:mascotas(especie)"),
+    supabase.from("citas").select("estado"),
     supabase.from("citas")
       .select("*, mascotas(nombre, especie), veterinarios(usuarios(nombre, apellido))")
       .eq("fecha", hoy)
