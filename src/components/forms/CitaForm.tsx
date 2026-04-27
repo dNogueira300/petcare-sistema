@@ -4,12 +4,12 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
-import { hoyCimaFecha, slotsDisponibles } from "@/utils/datetime";
+import { AvailabilityCalendar } from "@/components/ui/availability-calendar";
+import { TimeSlotsGrid } from "@/components/ui/time-slots-grid";
 
 const schema = z.object({
   id_mascota: z.string().min(1, "Selecciona una mascota"),
@@ -29,18 +29,18 @@ interface CitaFormProps {
 interface MascotaOption { id_mascota: number; nombre: string; especie: string }
 interface VetOption { id_veterinario: number; usuarios: { nombre: string; apellido: string } }
 
-function labelFecha(fecha: string): string | null {
-  if (!fecha) return null;
-  const [y, mo, d] = fecha.split("-").map(Number);
-  const dow = new Date(y, mo - 1, d).getDay();
-  if (dow === 0) return "Los domingos no hay atención";
-  return null;
+function dateToStr(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 export function CitaForm({ onSubmit }: CitaFormProps) {
   const [mascotas, setMascotas] = useState<MascotaOption[]>([]);
   const [veterinarios, setVeterinarios] = useState<VetOption[]>([]);
   const [disponibilidadErr, setDisponibilidadErr] = useState<string | null>(null);
+  const [selectedDay, setSelectedDay] = useState<Date | undefined>();
 
   useEffect(() => {
     fetch("/api/mascotas").then((r) => r.json()).then((j) => setMascotas(j.data ?? []));
@@ -56,13 +56,18 @@ export function CitaForm({ onSubmit }: CitaFormProps) {
   } = useForm<FormData>({ resolver: zodResolver(schema) });
 
   const selectedFecha = watch("fecha");
-  const slots = selectedFecha ? slotsDisponibles(selectedFecha) : [];
-  const esDomingo = !!labelFecha(selectedFecha);
+  const selectedHora = watch("hora");
+  const selectedVetId = watch("id_veterinario");
 
-  // Limpiar hora al cambiar fecha para evitar selecciones inválidas
-  useEffect(() => {
-    setValue("hora", "");
-  }, [selectedFecha, setValue]);
+  const handleDaySelect = (date: Date | undefined) => {
+    setSelectedDay(date);
+    setValue("fecha", date ? dateToStr(date) : "", { shouldValidate: true });
+    setValue("hora", "", { shouldValidate: false });
+  };
+
+  const handleSlotSelect = (hora: string) => {
+    setValue("hora", hora, { shouldValidate: true });
+  };
 
   const submit = async (data: FormData) => {
     setDisponibilidadErr(null);
@@ -91,16 +96,8 @@ export function CitaForm({ onSubmit }: CitaFormProps) {
     label: `${v.usuarios.nombre} ${v.usuarios.apellido}`,
   }));
 
-  const horaOptions = slots.map((h) => ({ value: h, label: h }));
-
-  const horaPlaceholder = !selectedFecha
-    ? "Selecciona una fecha primero"
-    : esDomingo
-    ? "Sin atención los domingos"
-    : "Seleccionar hora…";
-
   return (
-    <form onSubmit={handleSubmit(submit)} className="flex flex-col gap-4">
+    <form onSubmit={handleSubmit(submit)} className="flex flex-col gap-5">
       <Select
         label="Mascota"
         options={mascotaOptions}
@@ -115,27 +112,41 @@ export function CitaForm({ onSubmit }: CitaFormProps) {
         error={errors.id_veterinario?.message}
         {...register("id_veterinario")}
       />
-      <div className="grid grid-cols-2 gap-4">
-        <Input
-          label="Fecha"
-          type="date"
-          min={hoyCimaFecha()}
-          error={errors.fecha?.message}
-          {...register("fecha")}
-        />
-        <Select
-          label="Hora"
-          options={horaOptions}
-          placeholder={horaPlaceholder}
-          error={errors.hora?.message}
-          {...register("hora")}
-        />
-      </div>
-      {esDomingo && (
-        <p className="text-sm text-amber-600">
-          Los domingos no hay atención. Selecciona otro día.
+
+      {/* Calendar */}
+      <div>
+        <p style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.07em",
+          textTransform: "uppercase", color: "#6b5c44", marginBottom: "8px",
+          fontFamily: "var(--font-dm-sans)" }}>
+          Fecha
         </p>
+        <AvailabilityCalendar selected={selectedDay} onSelect={handleDaySelect} />
+        {errors.fecha && (
+          <p style={{ fontSize: "0.75rem", color: "#dc2626", fontFamily: "var(--font-dm-sans)",
+            marginTop: "4px" }}>
+            {errors.fecha.message}
+          </p>
+        )}
+      </div>
+
+      {/* Time slots grid */}
+      {selectedFecha && (
+        <div>
+          <TimeSlotsGrid
+            fecha={selectedFecha}
+            idVeterinario={selectedVetId || 0}
+            selected={selectedHora ?? ""}
+            onSelect={handleSlotSelect}
+          />
+          {errors.hora && (
+            <p style={{ fontSize: "0.75rem", color: "#dc2626", fontFamily: "var(--font-dm-sans)",
+              marginTop: "6px" }}>
+              {errors.hora.message}
+            </p>
+          )}
+        </div>
       )}
+
       <Textarea
         label="Motivo"
         placeholder="Describe el motivo de la consulta…"
@@ -152,9 +163,12 @@ export function CitaForm({ onSubmit }: CitaFormProps) {
         <Alert variant="error" message={disponibilidadErr} onClose={() => setDisponibilidadErr(null)} />
       )}
 
-      <Button type="submit" loading={isSubmitting} className="mt-2">
-        Agendar cita
-      </Button>
+      <div style={{ position:"sticky", bottom:0, background:"#fff",
+        borderTop:"1px solid #f0ead8", padding:"12px 0 16px", marginTop:"4px" }}>
+        <Button type="submit" loading={isSubmitting} className="w-full">
+          Agendar cita
+        </Button>
+      </div>
     </form>
   );
 }

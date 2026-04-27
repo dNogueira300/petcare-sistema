@@ -2,6 +2,7 @@
 export type Rol = "administrador" | "veterinario" | "recepcionista" | "cliente";
 
 export type EstadoCita = "pendiente" | "confirmada" | "cancelada" | "atendida";
+export type OrigenCita = "interno" | "portal";
 
 // ─── Entidades base ──────────────────────────────────────────────────────────
 export interface Usuario {
@@ -52,10 +53,20 @@ export interface Cita {
   hora: string;        // "HH:mm"
   motivo: string;
   estado: EstadoCita;
+  origen: OrigenCita;
   observaciones: string | null;
   creado_en: string;
   mascota?: Mascota;
   veterinario?: Veterinario;
+}
+
+export interface RecordatorioEnviado {
+  id: number;
+  id_cita: number;
+  canal: "email" | "whatsapp";
+  enviado_en: string;
+  estado: "enviado" | "fallido";
+  detalle: string | null;
 }
 
 export interface HistoriaClinica {

@@ -33,7 +33,10 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
 export async function PUT(req: NextRequest, { params }: Params) {
   const session = await getSessionUser();
-  if (!session || !["administrador", "recepcionista"].includes(session.rol)) {
+  if (!session) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+
+  const allowed = ["administrador", "recepcionista", "cliente"];
+  if (!allowed.includes(session.rol)) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
@@ -57,14 +60,35 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
   const admin = createAdminClient();
 
-  // Obtener la cita actual para saber el veterinario asignado
   const { data: current } = await admin
     .from("citas")
-    .select("id_veterinario, estado")
+    .select("id_cita, id_veterinario, estado, mascotas(id_mascota, id_cliente)")
     .eq("id_cita", id)
     .single();
 
   if (!current) return NextResponse.json({ error: "Cita no encontrada" }, { status: 404 });
+
+  // Verificar propiedad si es cliente
+  if (session.rol === "cliente") {
+    const { data: clienteData } = await admin
+      .from("clientes")
+      .select("id_cliente")
+      .eq("id_usuario", session.id_usuario)
+      .single();
+
+    const mascota = current.mascotas as unknown as { id_mascota: number; id_cliente: number } | null;
+    if (!clienteData || !mascota || mascota.id_cliente !== clienteData.id_cliente) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    }
+
+    if (!["pendiente", "confirmada"].includes(current.estado)) {
+      return NextResponse.json(
+        { error: "Solo puedes reprogramar citas pendientes o confirmadas" },
+        { status: 400 }
+      );
+    }
+  }
+
   if (current.estado === "cancelada") {
     return NextResponse.json({ error: "No se puede editar una cita cancelada" }, { status: 400 });
   }
@@ -110,7 +134,37 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Solo puedes cancelar citas" }, { status: 403 });
   }
 
-  const { data, error } = await createAdminClient()
+  const admin = createAdminClient();
+
+  if (parsed.data.estado === "atendida") {
+    const { data: citaInfo } = await admin
+      .from("citas")
+      .select("fecha")
+      .eq("id_cita", id)
+      .single();
+
+    if (citaInfo && citaInfo.fecha >= hoyCimaFecha()) {
+      return NextResponse.json(
+        { error: "La cita aún no ha ocurrido. Solo se puede marcar como atendida después de la fecha programada." },
+        { status: 400 }
+      );
+    }
+
+    const { data: historia } = await admin
+      .from("historia_clinica")
+      .select("id_historia")
+      .eq("id_cita", id)
+      .maybeSingle();
+
+    if (!historia) {
+      return NextResponse.json(
+        { error: "Debe registrar la historia clínica antes de marcar la cita como atendida." },
+        { status: 400 }
+      );
+    }
+  }
+
+  const { data, error } = await admin
     .from("citas")
     .update({ estado: parsed.data.estado })
     .eq("id_cita", id)

@@ -16,7 +16,10 @@ const createSchema = z.object({
 
 export async function GET(req: NextRequest) {
   const session = await getSessionUser();
-  if (!session || !["administrador", "veterinario"].includes(session.rol)) {
+  if (!session) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+
+  const allowed = ["administrador", "veterinario", "cliente"];
+  if (!allowed.includes(session.rol)) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
@@ -30,7 +33,24 @@ export async function GET(req: NextRequest) {
     .select("*, mascotas(nombre), veterinarios(usuarios(nombre, apellido)), citas(fecha, hora, motivo)")
     .order("fecha_consulta", { ascending: false });
 
-  if (id_mascota) query = query.eq("id_mascota", id_mascota);
+  if (session.rol === "cliente") {
+    // Filtrar solo las historias de las mascotas del cliente
+    const { data: clienteData } = await supabase
+      .from("clientes")
+      .select("id_cliente")
+      .eq("id_usuario", session.id_usuario)
+      .single();
+    if (!clienteData) return NextResponse.json({ data: [] });
+    const { data: mascotas } = await supabase
+      .from("mascotas")
+      .select("id_mascota")
+      .eq("id_cliente", clienteData.id_cliente);
+    const ids = (mascotas ?? []).map((m: { id_mascota: number }) => m.id_mascota);
+    if (ids.length === 0) return NextResponse.json({ data: [] });
+    query = query.in("id_mascota", ids);
+  } else if (id_mascota) {
+    query = query.eq("id_mascota", id_mascota);
+  }
 
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

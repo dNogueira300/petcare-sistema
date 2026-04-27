@@ -1,11 +1,15 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/api/auth/login"];
+const PUBLIC_PATHS = ["/login", "/api/auth/login", "/api/public/", "/api/recordatorios"];
+// La raíz "/" es la landing page pública — no requiere sesión
+const PUBLIC_EXACT = ["/"];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
+  const isPublic =
+    PUBLIC_EXACT.includes(pathname) ||
+    PUBLIC_PATHS.some((p) => pathname.startsWith(p));
   if (isPublic) return NextResponse.next();
 
   const session = request.cookies.get("session");

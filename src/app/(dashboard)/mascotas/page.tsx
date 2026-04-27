@@ -97,7 +97,10 @@ function EditMascotaForm({ mascota, onSubmit }: { mascota: MascotaRow; onSubmit:
           <input type="number" step="0.01" value={peso} onChange={(e) => setPeso(e.target.value)} className={inputCls} />
         </div>
       </div>
-      <Button type="submit" loading={submitting} className="mt-2">Guardar cambios</Button>
+      <div style={{ position:"sticky", bottom:0, background:"#fff",
+        borderTop:"1px solid #f0ead8", padding:"12px 0 16px", marginTop:"4px" }}>
+        <Button type="submit" loading={submitting} className="w-full">Guardar cambios</Button>
+      </div>
     </form>
   );
 }

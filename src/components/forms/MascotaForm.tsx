@@ -103,9 +103,12 @@ export function MascotaForm({ defaultClienteId, onSubmit }: MascotaFormProps) {
           {...register("peso")}
         />
       </div>
-      <Button type="submit" loading={isSubmitting} className="mt-2">
-        Registrar mascota
-      </Button>
+      <div style={{ position:"sticky", bottom:0, background:"#fff",
+        borderTop:"1px solid #f0ead8", padding:"12px 0 16px", marginTop:"4px" }}>
+        <Button type="submit" loading={isSubmitting} className="w-full">
+          Registrar mascota
+        </Button>
+      </div>
     </form>
   );
 }

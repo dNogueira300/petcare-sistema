@@ -11,9 +11,10 @@ const createSchema = z.object({
   hora: z.string().regex(/^\d{2}:\d{2}$/),
   motivo: z.string().min(5),
   observaciones: z.string().optional(),
+  origen: z.enum(["interno", "portal"]).optional(),
 });
 
-const WRITE_ROLES = ["administrador", "recepcionista"];
+const WRITE_ROLES = ["administrador", "recepcionista", "cliente"];
 
 export async function GET(req: NextRequest) {
   const session = await getSessionUser();
@@ -23,6 +24,7 @@ export async function GET(req: NextRequest) {
   const fecha = searchParams.get("fecha");
   const id_veterinario = searchParams.get("id_veterinario");
   const estado = searchParams.get("estado");
+  const origen = searchParams.get("origen");
 
   const supabase = createAdminClient();
 
@@ -40,9 +42,14 @@ export async function GET(req: NextRequest) {
       .select("id_cliente")
       .eq("id_usuario", session.id_usuario)
       .single();
-    if (clienteData) {
-      query = query.eq("mascotas.id_cliente", clienteData.id_cliente);
-    }
+    if (!clienteData) return NextResponse.json({ data: [] });
+    const { data: mascotasData } = await supabase
+      .from("mascotas")
+      .select("id_mascota")
+      .eq("id_cliente", clienteData.id_cliente);
+    const ids = (mascotasData ?? []).map((m: { id_mascota: number }) => m.id_mascota);
+    if (ids.length === 0) return NextResponse.json({ data: [] });
+    query = query.in("id_mascota", ids);
   } else if (session.rol === "veterinario") {
     const { data: vetData } = await supabase
       .from("veterinarios")
@@ -55,6 +62,7 @@ export async function GET(req: NextRequest) {
   if (fecha) query = query.eq("fecha", fecha);
   if (id_veterinario) query = query.eq("id_veterinario", id_veterinario);
   if (estado) query = query.eq("estado", estado);
+  if (origen) query = query.eq("origen", origen);
 
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -102,9 +110,11 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const origen = session.rol === "cliente" ? "portal" : (parsed.data.origen ?? "interno");
+
   const { data, error } = await admin
     .from("citas")
-    .insert({ ...parsed.data, estado: "pendiente" })
+    .insert({ ...parsed.data, estado: "pendiente", origen })
     .select()
     .single();
 

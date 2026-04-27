@@ -13,7 +13,10 @@ export function Loading({ size = "md", text, className }: LoadingProps) {
   const px = sizes[size];
   return (
     <div
-      className={cn("flex flex-col items-center justify-center gap-3", className)}
+      className={cn(
+        "flex flex-col items-center justify-center gap-3",
+        className,
+      )}
     >
       <div className="relative animate-pulse">
         <Image
@@ -31,7 +34,7 @@ export function Loading({ size = "md", text, className }: LoadingProps) {
 
 export function PageLoading() {
   return (
-    <div className="flex min-h-[400px] items-center justify-center">
+    <div className="flex min-h-100 items-center justify-center">
       <Loading size="lg" text="Cargando..." />
     </div>
   );

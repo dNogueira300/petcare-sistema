@@ -51,11 +51,11 @@ export function useAuth() {
     []
   );
 
-  const logout = useCallback(async () => {
+  const logout = useCallback(async (redirectTo = "/login") => {
     sessionStorage.removeItem("petcare_user");
     setState({ user: null, isLoading: false });
     await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
+    router.push(redirectTo);
   }, [router]);
 
   return { ...state, login, logout };

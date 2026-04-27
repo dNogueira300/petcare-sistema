@@ -1,11 +1,12 @@
 "use client";
 
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { PasswordStrength } from "@/components/ui/password-strength";
 import { passwordSchema, PASSWORD_HINT } from "@/utils/password";
 
 const baseFields = {
@@ -38,40 +39,83 @@ const rolOptions = [
   { value: "recepcionista", label: "Recepcionista" },
 ];
 
-export function UsuarioForm({ defaultValues, onSubmit, isEdit }: UsuarioFormProps) {
+export function UsuarioForm({
+  defaultValues,
+  onSubmit,
+  isEdit,
+}: UsuarioFormProps) {
   const schema = isEdit ? editSchema : createSchema;
 
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors, isSubmitting },
-  } = useForm<FormData>({
-    resolver: zodResolver(schema as z.ZodType<FormData>),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } = useForm<any>({
+    resolver: zodResolver(schema),
     defaultValues,
   });
 
+  const contrasenaValue = useWatch({
+    control,
+    name: "contrasena" as never,
+    defaultValue: "",
+  }) as string;
   const e = errors as Record<string, { message?: string }>;
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-4">
-        <Input label="Nombre" error={e.nombre?.message} {...register("nombre")} />
-        <Input label="Apellido" error={e.apellido?.message} {...register("apellido")} />
-      </div>
-      <Input label="Correo" type="email" error={e.correo?.message} {...register("correo")} />
-      {!isEdit && (
         <Input
-          label="Contraseña"
-          type="password"
-          hint={PASSWORD_HINT}
-          error={e.contrasena?.message}
-          {...register("contrasena" as never)}
+          label="Nombre"
+          error={e.nombre?.message}
+          {...register("nombre")}
         />
+        <Input
+          label="Apellido"
+          error={e.apellido?.message}
+          {...register("apellido")}
+        />
+      </div>
+      <Input
+        label="Correo"
+        type="email"
+        error={e.correo?.message}
+        {...register("correo")}
+      />
+      {!isEdit && (
+        <div>
+          <Input
+            label="Contraseña"
+            type="password"
+            hint={PASSWORD_HINT}
+            error={e.contrasena?.message}
+            {...register("contrasena" as never)}
+          />
+          <PasswordStrength value={contrasenaValue ?? ""} />
+        </div>
       )}
-      <Select label="Rol" options={rolOptions} error={e.rol?.message} {...register("rol")} />
-      <Button type="submit" loading={isSubmitting} className="mt-2">
-        {isEdit ? "Guardar cambios" : "Crear usuario"}
-      </Button>
+      <Select
+        label="Rol"
+        options={rolOptions}
+        error={e.rol?.message}
+        {...register("rol")}
+      />
+      <div
+        style={{
+          position: "sticky",
+          bottom: 0,
+          background: "#fff",
+          borderTop: "1px solid #f0ead8",
+          padding: "12px 0 16px",
+          marginTop: "4px",
+        }}
+      >
+        <Button type="submit" loading={isSubmitting} className="w-full">
+          {isEdit ? "Guardar cambios" : "Crear usuario"}
+        </Button>
+      </div>
     </form>
   );
 }

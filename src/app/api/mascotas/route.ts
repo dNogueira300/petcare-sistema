@@ -3,10 +3,10 @@ import { z } from "zod";
 import { createAdminClient } from "@/utils/supabase/server";
 import { getSessionUser } from "@/lib/auth";
 
-const ALLOWED_ROLES = ["administrador", "veterinario", "recepcionista"];
+const ALLOWED_ROLES = ["administrador", "veterinario", "recepcionista", "cliente"];
 
 const createSchema = z.object({
-  id_cliente: z.number().int().positive(),
+  id_cliente: z.number().int().positive().optional(),
   nombre: z.string().min(1),
   especie: z.string().min(1),
   raza: z.string().optional(),
@@ -59,9 +59,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { data, error } = await createAdminClient()
+  const supabase = createAdminClient();
+  let id_cliente = parsed.data.id_cliente;
+
+  if (session.rol === "cliente") {
+    const { data: clienteData } = await supabase
+      .from("clientes")
+      .select("id_cliente")
+      .eq("id_usuario", session.id_usuario)
+      .single();
+    if (!clienteData) return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
+    id_cliente = clienteData.id_cliente;
+  }
+
+  if (!id_cliente) {
+    return NextResponse.json({ error: "Se requiere id_cliente" }, { status: 400 });
+  }
+
+  const { data, error } = await supabase
     .from("mascotas")
-    .insert(parsed.data)
+    .insert({ ...parsed.data, id_cliente })
     .select()
     .single();
 

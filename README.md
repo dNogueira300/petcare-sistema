@@ -1,36 +1,79 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Veterinaria PetCare — Sistema de Gestión
 
-## Getting Started
+Sistema web para la gestión integral de una clínica veterinaria: citas, historias clínicas, clientes, mascotas y reportes. Desarrollado como proyecto de análisis de sistemas para la UNAP.
 
-First, run the development server:
+## Stack tecnológico
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+| Capa | Tecnología |
+|---|---|
+| Framework | Next.js 15 (App Router) |
+| Lenguaje | TypeScript |
+| Base de datos | Supabase (PostgreSQL + RLS) |
+| Autenticación | JWT personalizado con cookies httpOnly |
+| Estilos | Tailwind CSS v4 |
+| Formularios | React Hook Form + Zod |
+| Correos | Brevo SDK (`@getbrevo/brevo`) |
+| Despliegue | Vercel |
+
+## Módulos
+
+- **Dashboard** — métricas, gráficos y próximas citas (solo administrador)
+- **Citas** — CRUD completo con calendario visual y validación de horarios
+- **Mascotas** — registro y edición vinculada a clientes
+- **Clientes** — gestión de clientes con creación de cuenta automática
+- **Usuarios** — administración de staff (admin, veterinario, recepcionista)
+- **Historia clínica** — registro por cita, acceso exclusivo para veterinarios
+- **Reportes** — estadísticas por estado, veterinario, especie, día y origen
+- **Portal del cliente** — vista de citas, reprogramación y acceso público vía token
+- **Recordatorios** — envío automático de correo 24 h antes de cada cita (cron job)
+
+## Roles
+
+| Rol | Permisos |
+|---|---|
+| `administrador` | Acceso total, reportes, gestión de usuarios |
+| `veterinario` | Citas, historia clínica, mascotas |
+| `recepcionista` | Citas, clientes, mascotas |
+| `cliente` | Solo portal: ver y reprogramar sus citas |
+
+## Variables de entorno
+
+Crea un archivo `.env.local` en la raíz con:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+JWT_SECRET=
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+
+# Brevo (correos transaccionales)
+BREVO_SMTP_PASS=xkeysib-...
+BREVO_FROM_EMAIL=noreply@petcare.pe
+BREVO_FROM_NAME=Veterinaria PetCare
+
+# Cron job de recordatorios
+CRON_SECRET=
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Instalación y desarrollo
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm install
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Abre [http://localhost:3000](http://localhost:3000) en el navegador.
 
-## Learn More
+## Despliegue
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+# Build de producción
+npm run build
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+El proyecto está configurado para desplegarse en Vercel. Las rutas del proxy (`/api/proxy/*`) están definidas en `vercel.json`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Base de datos
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+El schema SQL completo se encuentra en `src/database/schema.sql`. Incluye las tablas, políticas RLS y la tabla `recordatorios_enviados` para el control de duplicados del cron.

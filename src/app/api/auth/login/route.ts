@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { verifyCredentials } from "@/lib/auth";
+import { createAdminClient } from "@/utils/supabase/server";
 import { cookies } from "next/headers";
 
 const schema = z.object({
@@ -8,7 +9,8 @@ const schema = z.object({
   contrasena: z.string().min(6),
 });
 
-const attempts = new Map<string, { count: number; until: number }>();
+const MAX_INTENTOS = 5;
+const BLOQUEO_MS = 15 * 60 * 1000;
 
 export async function POST(req: NextRequest) {
   try {
@@ -23,38 +25,55 @@ export async function POST(req: NextRequest) {
     }
 
     const { correo, contrasena } = parsed.data;
+    const supabase = createAdminClient();
 
-    const record = attempts.get(correo);
-    if (record && record.count >= 5 && Date.now() < record.until) {
-      return NextResponse.json(
-        { error: "Cuenta bloqueada temporalmente. Intenta en 15 minutos." },
-        { status: 423 },
-      );
+    // Verificar bloqueo en DB
+    const { data: usuarioDB } = await supabase
+      .from("usuarios")
+      .select("id_usuario, bloqueado_hasta, intentos_fallidos, activo")
+      .eq("correo", correo)
+      .single();
+
+    if (usuarioDB?.bloqueado_hasta) {
+      const bloqueadoHasta = new Date(usuarioDB.bloqueado_hasta);
+      if (bloqueadoHasta > new Date()) {
+        const minutos = Math.ceil((bloqueadoHasta.getTime() - Date.now()) / 60000);
+        return NextResponse.json(
+          { error: `Cuenta bloqueada temporalmente. Intenta en ${minutos} minuto${minutos !== 1 ? "s" : ""}.` },
+          { status: 429 },
+        );
+      }
     }
 
     const usuario = await verifyCredentials(correo, contrasena);
 
     if (!usuario) {
-      const prev = attempts.get(correo) ?? { count: 0, until: 0 };
-      const count = prev.count + 1;
-      attempts.set(correo, {
-        count,
-        until: count >= 5 ? Date.now() + 15 * 60 * 1000 : 0,
-      });
-      console.log(`[AUTH] Login failed for ${correo}. Attempts: ${count}`);
+      if (usuarioDB) {
+        const nuevosIntentos = (usuarioDB.intentos_fallidos ?? 0) + 1;
+        const update: Record<string, unknown> = { intentos_fallidos: nuevosIntentos };
+        if (nuevosIntentos >= MAX_INTENTOS) {
+          update.bloqueado_hasta = new Date(Date.now() + BLOQUEO_MS).toISOString();
+          update.intentos_fallidos = 0;
+        }
+        await supabase
+          .from("usuarios")
+          .update(update)
+          .eq("id_usuario", usuarioDB.id_usuario);
+      }
       return NextResponse.json(
         { error: "Correo o contraseña incorrectos" },
         { status: 401 },
       );
     }
 
-    attempts.delete(correo);
+    // Login exitoso — resetear contador
+    await supabase
+      .from("usuarios")
+      .update({ intentos_fallidos: 0, bloqueado_hasta: null })
+      .eq("id_usuario", usuario.id_usuario);
 
-    // Excluir contrasena_hash de la respuesta por seguridad
-    const { ...safeUser } = usuario;
-    const sessionValue = Buffer.from(JSON.stringify(safeUser)).toString(
-      "base64",
-    );
+    const { contrasena_hash: _, ...safeUser } = usuario;
+    const sessionValue = Buffer.from(JSON.stringify(safeUser)).toString("base64");
 
     const cookieStore = await cookies();
     cookieStore.set("session", sessionValue, {
@@ -62,7 +81,7 @@ export async function POST(req: NextRequest) {
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-      maxAge: 60 * 60 * 8, // 8 hours
+      maxAge: 60 * 60 * 8,
     });
 
     return NextResponse.json({ user: safeUser });

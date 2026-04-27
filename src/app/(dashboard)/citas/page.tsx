@@ -1,24 +1,28 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CalendarPlus, Pencil } from "lucide-react";
+import { CalendarPlus, Pencil, FilePlus, Eye } from "lucide-react";
 import { Table, type Column } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select } from "@/components/ui/select";
 import { Modal } from "@/components/ui/modal";
 import { CitaForm } from "@/components/forms/CitaForm";
+import { HistoriaClinicaForm, type PrefillCita } from "@/components/forms/HistoriaClinicaForm";
 import { formatLima, hoyCimaFecha, slotsDisponibles } from "@/utils/datetime";
-import type { EstadoCita } from "@/types";
+import type { EstadoCita, OrigenCita } from "@/types";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/context/toast";
 
 interface CitaRow {
   id_cita: number;
+  id_mascota: number;
+  id_veterinario: number;
   fecha: string;
   hora: string;
   motivo: string;
   estado: EstadoCita;
+  origen: OrigenCita;
   mascotas: { nombre: string; especie: string };
   veterinarios: { usuarios: { nombre: string; apellido: string } };
 }
@@ -108,9 +112,12 @@ function EditCitaForm({
       {esDomingo && (
         <p className="text-sm text-amber-600">Los domingos no hay atención. Selecciona otro día.</p>
       )}
-      <Button type="submit" loading={submitting} disabled={!hora} className="mt-2">
-        Guardar cambios
-      </Button>
+      <div style={{ position:"sticky", bottom:0, background:"#fff",
+        borderTop:"1px solid #f0ead8", padding:"12px 0 16px", marginTop:"4px" }}>
+        <Button type="submit" loading={submitting} disabled={!hora} className="w-full">
+          Guardar cambios
+        </Button>
+      </div>
     </form>
   );
 }
@@ -121,8 +128,11 @@ export default function CitasPage() {
   const [estadoFilter, setEstadoFilter] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [editItem, setEditItem] = useState<CitaRow | null>(null);
+  const [historiaItem, setHistoriaItem] = useState<PrefillCita | null>(null);
+  const [detailItem, setDetailItem] = useState<CitaRow | null>(null);
   const { user } = useAuth();
   const canEdit = user?.rol === "administrador" || user?.rol === "recepcionista";
+  const isVet = user?.rol === "veterinario";
   const toast = useToast();
 
   const fetchCitas = async (estado = "") => {
@@ -178,7 +188,37 @@ export default function CitasPage() {
     if (res.ok) {
       toast.success("Estado actualizado");
       fetchCitas(estadoFilter);
+    } else {
+      const json = await res.json();
+      toast.error(json.error ?? "Error al cambiar estado");
     }
+  };
+
+  const handleHistoriaSubmit = async (data: Record<string, unknown>) => {
+    const res = await fetch("/api/historia-clinica", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    if (res.ok) {
+      setHistoriaItem(null);
+      toast.success("Historia clínica registrada. Cita marcada como atendida.");
+      fetchCitas(estadoFilter);
+    } else {
+      const json = await res.json();
+      toast.error(json.error ?? "Error al registrar historia clínica");
+    }
+  };
+
+  const openHistoria = (c: CitaRow) => {
+    setHistoriaItem({
+      id_cita: c.id_cita,
+      id_mascota: c.id_mascota,
+      id_veterinario: c.id_veterinario,
+      fecha: c.fecha,
+      mascotas: c.mascotas,
+      veterinarios: c.veterinarios,
+    });
   };
 
   const columns: Column<CitaRow>[] = [
@@ -204,13 +244,35 @@ export default function CitasPage() {
     {
       key: "estado",
       header: "Estado",
-      render: (c) => <Badge variant={c.estado}>{estadoLabels[c.estado]}</Badge>,
+      render: (c) => (
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <Badge variant={c.estado}>{estadoLabels[c.estado]}</Badge>
+          {c.origen === "portal" && c.estado === "pendiente" && (
+            <span style={{ fontSize:"0.65rem", fontWeight:700, letterSpacing:"0.08em",
+              textTransform:"uppercase", background:"#fdf3dc", color:"#a07028",
+              border:"1px solid #f0d080", borderRadius:"99px", padding:"2px 7px",
+              fontFamily:"var(--font-dm-sans)", whiteSpace:"nowrap" }}>
+              Portal
+            </span>
+          )}
+        </div>
+      ),
     },
     {
       key: "acciones",
       header: "Acciones",
       render: (c) => (
         <div className="flex items-center gap-1">
+          {/* Ver detalle — siempre disponible, especialmente para atendidas */}
+          {c.estado === "atendida" && (
+            <button
+              onClick={() => setDetailItem(c)}
+              title="Ver detalle"
+              className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+            >
+              <Eye className="size-4" />
+            </button>
+          )}
           {canEdit && c.estado !== "cancelada" && c.estado !== "atendida" && (
             <button
               onClick={() => setEditItem(c)}
@@ -218,6 +280,16 @@ export default function CitasPage() {
               className="rounded-lg p-1.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-colors"
             >
               <Pencil className="size-4" />
+            </button>
+          )}
+          {/* Historia clínica — veterinario y admin en citas confirmadas */}
+          {(isVet || canEdit) && c.estado === "confirmada" && (
+            <button
+              onClick={() => openHistoria(c)}
+              title="Llenar historia clínica"
+              className="rounded-lg p-1.5 text-gray-400 hover:bg-green-50 hover:text-green-700 transition-colors"
+            >
+              <FilePlus className="size-4" />
             </button>
           )}
           {c.estado === "pendiente" && (
@@ -284,6 +356,40 @@ export default function CitasPage() {
 
       <Modal open={!!editItem} onClose={() => setEditItem(null)} title="Editar cita">
         {editItem && <EditCitaForm cita={editItem} onSubmit={handleEdit} />}
+      </Modal>
+
+      <Modal open={!!historiaItem} onClose={() => setHistoriaItem(null)} title="Historia clínica" className="max-w-2xl">
+        {historiaItem && (
+          <HistoriaClinicaForm
+            key={historiaItem.id_cita}
+            prefillCita={historiaItem}
+            onSubmit={handleHistoriaSubmit}
+          />
+        )}
+      </Modal>
+
+      {/* Detalle de cita atendida */}
+      <Modal open={!!detailItem} onClose={() => setDetailItem(null)} title="Detalle de la cita">
+        {detailItem && (
+          <div className="flex flex-col gap-3">
+            {[
+              ["Mascota", `${detailItem.mascotas?.nombre ?? "—"} (${detailItem.mascotas?.especie ?? ""})`],
+              ["Fecha", formatLima(`${detailItem.fecha}T00:00:00`, "dd/MM/yyyy")],
+              ["Hora", detailItem.hora.slice(0, 5)],
+              ["Veterinario", detailItem.veterinarios ? `${detailItem.veterinarios.usuarios.nombre} ${detailItem.veterinarios.usuarios.apellido}` : "—"],
+              ["Motivo", detailItem.motivo],
+            ].map(([label, value]) => (
+              <div key={label} className="flex justify-between items-start py-2 border-b border-gray-100">
+                <span className="text-xs font-semibold uppercase tracking-wide text-gray-500 shrink-0">{label}</span>
+                <span className="text-sm text-gray-900 text-right ml-4">{value}</span>
+              </div>
+            ))}
+            <div className="flex justify-between items-center py-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Estado</span>
+              <Badge variant={detailItem.estado}>{estadoLabels[detailItem.estado]}</Badge>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

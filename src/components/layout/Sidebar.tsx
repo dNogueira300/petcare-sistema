@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
   CalendarDays,
@@ -10,6 +11,7 @@ import {
   PawPrint,
   FileText,
   UserCog,
+  BarChart2,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
@@ -41,6 +43,7 @@ const navItems: NavItem[] = [
     module: "historia-clinica",
   },
   { href: "/usuarios", icon: UserCog, label: "Usuarios", module: "usuarios" },
+  { href: "/reportes", icon: BarChart2, label: "Reportes", module: "reportes" },
 ];
 
 interface SidebarProps {
@@ -69,6 +72,16 @@ export function Sidebar({
   const visible = navItems.filter(
     (item) => !rol || canAccess(rol, item.module),
   );
+
+  const [citasNuevasPortal, setCitasNuevasPortal] = useState(0);
+
+  useEffect(() => {
+    if (!rol || rol === "cliente" || rol === "veterinario") return;
+    fetch("/api/citas?origen=portal&estado=pendiente")
+      .then((r) => r.json())
+      .then((j) => setCitasNuevasPortal((j.data ?? []).length))
+      .catch(() => {});
+  }, [rol]);
 
   const W = collapsed ? 64 : 230;
 
@@ -271,14 +284,26 @@ export function Sidebar({
                       }
                     }}
                   >
-                    <Icon
-                      style={{
-                        width: "16px",
-                        height: "16px",
-                        flexShrink: 0,
-                        color: isActive ? "#55a876" : "rgba(255,255,255,0.45)",
-                      }}
-                    />
+                    <div style={{ position: "relative", flexShrink: 0 }}>
+                      <Icon
+                        style={{
+                          width: "16px",
+                          height: "16px",
+                          color: isActive ? "#55a876" : "rgba(255,255,255,0.45)",
+                        }}
+                      />
+                      {item.module === "citas" && citasNuevasPortal > 0 && (
+                        <span style={{
+                          position: "absolute", top: "-5px", right: "-6px",
+                          background: "#c48c34", color: "#fff", borderRadius: "99px",
+                          fontSize: "0.58rem", fontWeight: 700, lineHeight: 1,
+                          padding: "2px 4px", minWidth: "14px", textAlign: "center",
+                          fontFamily: "var(--font-dm-sans)",
+                        }}>
+                          {citasNuevasPortal > 9 ? "9+" : citasNuevasPortal}
+                        </span>
+                      )}
+                    </div>
                     {!collapsed && (
                       <span
                         className="nav-label"
