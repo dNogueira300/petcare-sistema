@@ -1297,8 +1297,8 @@ function BookingModal({
       // Auto-login tras registro exitoso → redirigir al portal del cliente
       const loginErr = await login(reg.correo, reg.contrasena);
       if (loginErr) {
-        setError("Cuenta creada. Por favor inicia sesión.");
-        setStep("login");
+        onClose();
+        window.location.href = "/login";
         return;
       }
       window.location.href = "/portal";
@@ -1536,7 +1536,7 @@ function BookingModal({
                 <ArrowRight size={18} color="#3d845b" />
               </button>
               <button
-                onClick={() => setStep("login")}
+                onClick={() => { onClose(); window.location.href = "/login"; }}
                 style={{
                   padding: "18px",
                   borderRadius: "14px",
@@ -1685,7 +1685,7 @@ function BookingModal({
               </button>
               <button
                 type="button"
-                onClick={() => setStep("login")}
+                onClick={() => { onClose(); window.location.href = "/login"; }}
                 style={{
                   background: "none",
                   border: "none",
