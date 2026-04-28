@@ -1,6 +1,6 @@
 import { BrevoClient, BrevoEnvironment } from "@getbrevo/brevo";
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://petcare-sistema.vercel.app";
 
 /* ─── Cliente Brevo ────────────────────────────────────────────────────────
    La clave SMTP de Brevo (xkeysib-...) es la misma que la API key del SDK.

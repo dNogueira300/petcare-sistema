@@ -110,11 +110,9 @@ const STATS = [
 function Navbar({
   scrolled,
   onBook,
-  onLogin,
 }: {
   scrolled: boolean;
   onBook: () => void;
-  onLogin: () => void;
 }) {
   const { user } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -240,28 +238,26 @@ function Navbar({
           </Link>
         ) : (
           <>
-            <button
-              onClick={onLogin}
+            <Link
+              href="/login"
               style={{
-                background: "none",
-                border: "none",
-                cursor: "pointer",
                 color: "rgba(255,255,255,0.75)",
                 fontSize: "0.85rem",
                 fontFamily: "var(--font-dm-sans)",
                 padding: "8px 14px",
+                textDecoration: "none",
                 transition: "color 0.15s",
               }}
               onMouseEnter={(e) =>
-                ((e.currentTarget as HTMLButtonElement).style.color = "#fff")
+                ((e.currentTarget as HTMLAnchorElement).style.color = "#fff")
               }
               onMouseLeave={(e) =>
-                ((e.currentTarget as HTMLButtonElement).style.color =
+                ((e.currentTarget as HTMLAnchorElement).style.color =
                   "rgba(255,255,255,0.75)")
               }
             >
               Iniciar sesión
-            </button>
+            </Link>
             <button
               onClick={onBook}
               style={{
@@ -346,25 +342,21 @@ function Navbar({
             </button>
           ))}
           <div style={{ height: "16px" }} />
-          <button
-            onClick={() => {
-              onLogin();
-              setMobileOpen(false);
-            }}
+          <Link
+            href="/login"
+            onClick={() => setMobileOpen(false)}
             style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
               color: "rgba(255,255,255,0.75)",
               fontSize: "0.9rem",
               fontFamily: "var(--font-dm-sans)",
               marginBottom: "10px",
               textAlign: "left",
-              padding: 0,
+              textDecoration: "none",
+              display: "block",
             }}
           >
             Iniciar sesión
-          </button>
+          </Link>
           <button
             onClick={() => {
               onBook();
@@ -2023,14 +2015,10 @@ export default function LandingPage() {
     setBookingStep("choice");
     setBookingOpen(true);
   };
-  const openLogin = () => {
-    setBookingStep("login");
-    setBookingOpen(true);
-  };
 
   return (
     <>
-      <Navbar scrolled={scrolled} onBook={openBook} onLogin={openLogin} />
+      <Navbar scrolled={scrolled} onBook={openBook} />
       <Hero onBook={openBook} />
       <ServicesSection />
       <StatsSection />

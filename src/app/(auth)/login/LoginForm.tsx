@@ -6,7 +6,7 @@ import Image from "next/image";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Mail, Lock, PawPrint } from "lucide-react";
+import { Mail, Lock, PawPrint, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
 const schema = z.object({
@@ -32,6 +32,7 @@ export function LoginForm() {
   const params = useSearchParams();
   const { login } = useAuth();
   const [error, setError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   const {
     register,
@@ -46,7 +47,10 @@ export function LoginForm() {
       setError(err);
       return;
     }
-    router.push(params.get("next") ?? "/dashboard");
+    const stored = sessionStorage.getItem("petcare_user");
+    const u = stored ? JSON.parse(stored) : null;
+    const dest = u?.rol === "cliente" ? "/portal" : (params.get("next") ?? "/dashboard");
+    router.push(dest);
   };
 
   return (
@@ -178,15 +182,15 @@ export function LoginForm() {
                 lineHeight: 1.7,
               }}
             >
-              Sistema integral de gestión de citas, historias clínicas y
-              seguimiento veterinario.
+              Gestión integral de tus mascotas, citas y atención veterinaria
+              en un solo lugar.
             </p>
 
             <ul className="space-y-3">
               {[
-                "Citas con verificación de disponibilidad",
-                "Historias clínicas por veterinario",
-                "Dashboard con métricas en tiempo real",
+                "Agenda y consulta tus citas fácilmente",
+                "Historial clínico completo por mascota",
+                "Seguimiento del bienestar de tu paciente",
               ].map((item, i) => (
                 <li key={i} className="flex items-center gap-3">
                   <span
@@ -297,7 +301,7 @@ export function LoginForm() {
                 fontFamily: "var(--font-dm-sans)",
               }}
             >
-              Accede al sistema de gestión veterinaria
+              Bienvenido de vuelta
             </p>
           </div>
 
@@ -450,13 +454,13 @@ export function LoginForm() {
                 />
                 <input
                   id="contrasena"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   autoComplete="current-password"
                   placeholder="••••••••"
                   style={{
                     width: "100%",
                     height: "46px",
-                    padding: "0 14px 0 38px",
+                    padding: "0 44px 0 38px",
                     background: "var(--input-bg)",
                     border: errors.contrasena
                       ? "1.5px solid #f87171"
@@ -471,6 +475,29 @@ export function LoginForm() {
                   className="login-input"
                   {...register("contrasena")}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  style={{
+                    position: "absolute",
+                    right: "13px",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    padding: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    color: "#a89a80",
+                  }}
+                  tabIndex={-1}
+                  aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                >
+                  {showPassword
+                    ? <EyeOff style={{ width: "15px", height: "15px" }} />
+                    : <Eye style={{ width: "15px", height: "15px" }} />}
+                </button>
               </div>
               {errors.contrasena && (
                 <p
@@ -556,7 +583,7 @@ export function LoginForm() {
                     Verificando…
                   </>
                 ) : (
-                  "Ingresar al sistema"
+                  "Iniciar sesión"
                 )}
               </button>
             </div>
@@ -570,7 +597,7 @@ export function LoginForm() {
               fontFamily: "var(--font-dm-sans)",
             }}
           >
-            Sistema PetCare · Gestión Veterinaria
+            PetCare · Clínica Veterinaria
           </p>
         </div>
       </div>

@@ -576,8 +576,10 @@ export default function PortalPage() {
         height:"64px", display:"flex", alignItems:"center", justifyContent:"space-between",
         position:"sticky", top:0, zIndex:50 }}>
         <div style={{ display:"flex", alignItems:"center", gap:"16px" }}>
-          <Image src="/logo/logo_h.png" alt="PetCare" width={100} height={28}
-            style={{ height:"auto", filter:"brightness(0) invert(1)", opacity:0.9 }} />
+          <Link href="/" style={{ display:"flex", alignItems:"center" }}>
+            <Image src="/logo/logo_h.png" alt="PetCare" width={100} height={28}
+              style={{ height:"auto", filter:"brightness(0) invert(1)", opacity:0.9 }} />
+          </Link>
           <div style={{ width:"1px", height:"20px", background:"rgba(255,255,255,0.15)" }} />
           <span style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.82rem", color:"rgba(255,255,255,0.55)" }}>
             Mi Portal
