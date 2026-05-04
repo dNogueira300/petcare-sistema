@@ -513,8 +513,25 @@ export function LoginForm() {
               )}
             </div>
 
+            {/* Forgot password */}
+            <div className="delay-3 animate-fade-up" style={{ display: "flex", justifyContent: "flex-end", marginTop: "-6px" }}>
+              <a
+                href="/forgot-password"
+                style={{
+                  fontSize: "0.78rem",
+                  color: "#c48c34",
+                  fontFamily: "var(--font-dm-sans)",
+                  textDecoration: "none",
+                }}
+                onMouseEnter={(e) => ((e.currentTarget as HTMLAnchorElement).style.textDecoration = "underline")}
+                onMouseLeave={(e) => ((e.currentTarget as HTMLAnchorElement).style.textDecoration = "none")}
+              >
+                ¿Olvidaste tu contraseña?
+              </a>
+            </div>
+
             {/* Submit */}
-            <div className="delay-3 animate-fade-up pt-1">
+            <div className="delay-4 animate-fade-up pt-1">
               <button
                 type="submit"
                 disabled={isSubmitting}
@@ -590,7 +607,7 @@ export function LoginForm() {
           </form>
 
           <p
-            className="delay-4 animate-fade-up mt-8 text-center"
+            className="delay-5 animate-fade-up mt-8 text-center"
             style={{
               fontSize: "0.72rem",
               color: "#c4b89c",

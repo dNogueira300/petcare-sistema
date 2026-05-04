@@ -88,6 +88,14 @@ CREATE TABLE IF NOT EXISTS historia_clinica (
   peso_consulta  DECIMAL(5,2)
 );
 
+-- ─── MIGRACIÓN: reset de contraseña por token ───────────────────────────────
+ALTER TABLE IF EXISTS usuarios
+  ADD COLUMN IF NOT EXISTS reset_token           VARCHAR(36),
+  ADD COLUMN IF NOT EXISTS reset_token_expires_at TIMESTAMPTZ;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_usuarios_reset_token
+  ON usuarios(reset_token) WHERE reset_token IS NOT NULL;
+
 -- ─── DATOS INICIALES: usuario administrador ─────────────────────────────────
 -- Contraseña: Admin2026* (bcrypt hash generado previamente)
 INSERT INTO usuarios (nombre, apellido, correo, contrasena_hash, rol)

@@ -125,50 +125,53 @@ export default function ReportesPage() {
       </div>
 
       {/* Filters */}
-      <div style={{ background:"var(--card-bg)", border:"1px solid var(--card-border)", borderRadius:"12px",
-        padding:"18px 20px", display:"flex", flexWrap:"wrap", gap:"14px", alignItems:"flex-end" }}>
-        <div style={{ display:"flex", alignItems:"center", gap:"6px", color:"#6b5c44", marginBottom:"2px", flex:"0 0 auto" }}>
+      <div style={{ background:"var(--card-bg)", border:"1px solid var(--card-border)", borderRadius:"12px", padding:"18px 20px" }}>
+        {/* Header row */}
+        <div style={{ display:"flex", alignItems:"center", gap:"6px", color:"#6b5c44", marginBottom:"14px" }}>
           <Filter size={14} />
           <span style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.78rem", fontWeight:600, textTransform:"uppercase", letterSpacing:"0.08em" }}>Filtros</span>
         </div>
-        {[["desde","Desde","date"], ["hasta","Hasta","date"]].map(([k,l,t])=>(
-          <div key={k}>
+        {/* Responsive grid: 2 cols on mobile, 4 on desktop */}
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))", gap:"14px", alignItems:"end" }}>
+          {[["desde","Desde","date"], ["hasta","Hasta","date"]].map(([k,l,t])=>(
+            <div key={k}>
+              <label style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.72rem", fontWeight:600, color:"#6b5c44",
+                textTransform:"uppercase", letterSpacing:"0.07em", display:"block", marginBottom:"4px" }}>{l}</label>
+              <input type={t} value={filters[k as keyof typeof filters]}
+                onChange={e=>setFilter(k as keyof typeof filters, e.target.value)}
+                style={{ width:"100%", height:"36px", border:"1.5px solid var(--input-border)", borderRadius:"8px",
+                  padding:"0 10px", fontFamily:"var(--font-dm-sans)", fontSize:"0.82rem",
+                  background:"var(--input-bg)", color:"#1a1208", outline:"none", boxSizing:"border-box" }} />
+            </div>
+          ))}
+          <div>
             <label style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.72rem", fontWeight:600, color:"#6b5c44",
-              textTransform:"uppercase", letterSpacing:"0.07em", display:"block", marginBottom:"4px" }}>{l}</label>
-            <input type={t} value={filters[k as keyof typeof filters]}
-              onChange={e=>setFilter(k as keyof typeof filters, e.target.value)}
-              style={{ height:"36px", border:"1.5px solid var(--input-border)", borderRadius:"8px",
+              textTransform:"uppercase", letterSpacing:"0.07em", display:"block", marginBottom:"4px" }}>Estado</label>
+            <select value={filters.estado} onChange={e=>setFilter("estado", e.target.value)}
+              style={{ width:"100%", height:"36px", border:"1.5px solid var(--input-border)", borderRadius:"8px",
                 padding:"0 10px", fontFamily:"var(--font-dm-sans)", fontSize:"0.82rem",
-                background:"var(--input-bg)", color:"#1a1208", outline:"none" }} />
+                background:"var(--input-bg)", color:"#1a1208", outline:"none", boxSizing:"border-box" }}>
+              <option value="">Todos los estados</option>
+              {["pendiente","confirmada","cancelada","atendida"].map(e=>(
+                <option key={e} value={e}>{estadoLabels[e]}</option>
+              ))}
+            </select>
           </div>
-        ))}
-        <div>
-          <label style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.72rem", fontWeight:600, color:"#6b5c44",
-            textTransform:"uppercase", letterSpacing:"0.07em", display:"block", marginBottom:"4px" }}>Estado</label>
-          <select value={filters.estado} onChange={e=>setFilter("estado", e.target.value)}
-            style={{ height:"36px", border:"1.5px solid var(--input-border)", borderRadius:"8px",
-              padding:"0 10px", fontFamily:"var(--font-dm-sans)", fontSize:"0.82rem",
-              background:"var(--input-bg)", color:"#1a1208", outline:"none", minWidth:"140px" }}>
-            <option value="">Todos los estados</option>
-            {["pendiente","confirmada","cancelada","atendida"].map(e=>(
-              <option key={e} value={e}>{estadoLabels[e]}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.72rem", fontWeight:600, color:"#6b5c44",
-            textTransform:"uppercase", letterSpacing:"0.07em", display:"block", marginBottom:"4px" }}>Veterinario</label>
-          <select value={filters.id_veterinario} onChange={e=>setFilter("id_veterinario", e.target.value)}
-            style={{ height:"36px", border:"1.5px solid var(--input-border)", borderRadius:"8px",
-              padding:"0 10px", fontFamily:"var(--font-dm-sans)", fontSize:"0.82rem",
-              background:"var(--input-bg)", color:"#1a1208", outline:"none", minWidth:"160px" }}>
-            <option value="">Todos los veterinarios</option>
-            {vets.map(v=>(
-              <option key={v.id_veterinario} value={v.id_veterinario}>
-                {v.usuarios.nombre} {v.usuarios.apellido}
-              </option>
-            ))}
-          </select>
+          <div>
+            <label style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.72rem", fontWeight:600, color:"#6b5c44",
+              textTransform:"uppercase", letterSpacing:"0.07em", display:"block", marginBottom:"4px" }}>Veterinario</label>
+            <select value={filters.id_veterinario} onChange={e=>setFilter("id_veterinario", e.target.value)}
+              style={{ width:"100%", height:"36px", border:"1.5px solid var(--input-border)", borderRadius:"8px",
+                padding:"0 10px", fontFamily:"var(--font-dm-sans)", fontSize:"0.82rem",
+                background:"var(--input-bg)", color:"#1a1208", outline:"none", boxSizing:"border-box" }}>
+              <option value="">Todos los veterinarios</option>
+              {vets.map(v=>(
+                <option key={v.id_veterinario} value={v.id_veterinario}>
+                  {v.usuarios.nombre} {v.usuarios.apellido}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 

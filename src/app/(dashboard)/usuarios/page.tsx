@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { UserPlus, Eye, Pencil, ToggleLeft, ToggleRight } from "lucide-react";
+import { UserPlus, Eye, Pencil, ToggleLeft, ToggleRight, KeyRound } from "lucide-react";
 import { Table, type Column } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { UsuarioForm } from "@/components/forms/UsuarioForm";
+import { ChangePasswordForm } from "@/components/forms/ChangePasswordForm";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/context/toast";
 
@@ -41,6 +42,7 @@ export default function UsuariosPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [detailItem, setDetailItem] = useState<Usuario | null>(null);
   const [editItem, setEditItem] = useState<Usuario | null>(null);
+  const [passwordItem, setPasswordItem] = useState<Usuario | null>(null);
   const { user } = useAuth();
   const isAdmin = user?.rol === "administrador";
   const toast = useToast();
@@ -88,6 +90,22 @@ export default function UsuariosPage() {
     }
   };
 
+  const handlePasswordChange = async (contrasena: string) => {
+    if (!passwordItem) return;
+    const res = await fetch(`/api/usuarios/${passwordItem.id_usuario}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contrasena }),
+    });
+    if (res.ok) {
+      setPasswordItem(null);
+      toast.success("Contraseña actualizada");
+    } else {
+      const json = await res.json();
+      toast.error(json.error ?? "Error al cambiar contraseña");
+    }
+  };
+
   const toggleActivo = async (u: Usuario) => {
     await fetch(`/api/usuarios/${u.id_usuario}`, {
       method: "PATCH",
@@ -130,6 +148,13 @@ export default function UsuariosPage() {
                 className="rounded-lg p-1.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-colors"
               >
                 <Pencil className="size-4" />
+              </button>
+              <button
+                onClick={() => setPasswordItem(u)}
+                title="Cambiar contraseña"
+                className="rounded-lg p-1.5 text-gray-400 hover:bg-amber-50 hover:text-amber-600 transition-colors"
+              >
+                <KeyRound className="size-4" />
               </button>
               <button
                 onClick={() => toggleActivo(u)}
@@ -195,6 +220,18 @@ export default function UsuariosPage() {
             }}
             onSubmit={handleEdit as never}
           />
+        )}
+      </Modal>
+
+      {/* Cambiar contraseña */}
+      <Modal open={!!passwordItem} onClose={() => setPasswordItem(null)} title="Cambiar contraseña">
+        {passwordItem && (
+          <>
+            <p style={{ fontFamily: "var(--font-dm-sans)", fontSize: "0.85rem", color: "#6b5c44", marginBottom: "16px" }}>
+              {passwordItem.nombre} {passwordItem.apellido} · {rolLabels[passwordItem.rol] ?? passwordItem.rol}
+            </p>
+            <ChangePasswordForm onSubmit={handlePasswordChange} />
+          </>
         )}
       </Modal>
     </div>

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/utils/supabase/server";
-import { getSessionUser } from "@/lib/auth";
+import { getSessionUser, hashPassword } from "@/lib/auth";
+import { passwordSchema } from "@/utils/password";
 
 const updateSchema = z.object({
   nombre: z.string().min(2).optional(),
@@ -61,8 +62,26 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
 
   const { id } = await params;
-  const { activo } = await req.json();
+  const body = await req.json();
 
+  if ("contrasena" in body) {
+    const parsed = z.object({ contrasena: passwordSchema }).safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message ?? "Contraseña inválida" },
+        { status: 400 }
+      );
+    }
+    const contrasena_hash = await hashPassword(parsed.data.contrasena);
+    const { error } = await createAdminClient()
+      .from("usuarios")
+      .update({ contrasena_hash })
+      .eq("id_usuario", id);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ success: true });
+  }
+
+  const { activo } = body;
   const { data, error } = await createAdminClient()
     .from("usuarios")
     .update({ activo })
