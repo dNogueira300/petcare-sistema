@@ -99,7 +99,7 @@ export default function UsuariosPage() {
 
   const columns: Column<Usuario>[] = [
     { key: "nombre", header: "Nombre", render: (u) => `${u.nombre} ${u.apellido}` },
-    { key: "correo", header: "Correo" },
+    { key: "correo", header: "Correo", className: "hidden md:table-cell" },
     { key: "rol", header: "Rol", render: (u) => <Badge variant="info">{rolLabels[u.rol] ?? u.rol}</Badge> },
     {
       key: "activo",
@@ -148,16 +148,17 @@ export default function UsuariosPage() {
   ];
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col gap-4 sm:gap-6">
+      <div className="flex items-center justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Usuarios</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Usuarios</h1>
           <p className="text-sm text-gray-500">Gestión de cuentas del sistema</p>
         </div>
         {isAdmin && (
           <Button onClick={() => setCreateOpen(true)}>
             <UserPlus className="size-4" />
-            Nuevo usuario
+            <span className="hidden sm:inline">Nuevo usuario</span>
+            <span className="sm:hidden">Nuevo</span>
           </Button>
         )}
       </div>

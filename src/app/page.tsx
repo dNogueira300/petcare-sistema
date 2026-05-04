@@ -630,10 +630,10 @@ function ServicesSection() {
   return (
     <section
       id="servicios"
-      style={{ background: "#faf8f3", padding: "100px clamp(24px,6vw,80px)" }}
+      style={{ background: "#faf8f3", padding: "clamp(60px,10vw,100px) clamp(20px,6vw,80px)" }}
     >
       <div style={{ maxWidth: "1100px", margin: "0 auto" }}>
-        <div data-reveal style={{ textAlign: "center", marginBottom: "64px" }}>
+        <div data-reveal style={{ textAlign: "center", marginBottom: "clamp(32px,6vw,64px)" }}>
           <span
             style={{
               color: "#3d845b",
@@ -649,7 +649,7 @@ function ServicesSection() {
           <h2
             style={{
               fontFamily: "var(--font-fraunces)",
-              fontSize: "clamp(2rem,4vw,2.8rem)",
+              fontSize: "clamp(1.8rem,4vw,2.8rem)",
               fontWeight: 700,
               fontStyle: "italic",
               color: "#1a1208",
@@ -660,13 +660,8 @@ function ServicesSection() {
             Todo lo que tu mascota necesita
           </h2>
         </div>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))",
-            gap: "24px",
-          }}
-        >
+        {/* carousel on mobile, grid on sm+ */}
+        <div className="land-services-grid">
           {SERVICES.map((s, i) => {
             const Icon = s.icon;
             return (
@@ -677,7 +672,7 @@ function ServicesSection() {
                 style={{
                   background: "#fff",
                   borderRadius: "16px",
-                  padding: "32px",
+                  padding: "28px",
                   border: "1px solid #e8e0d0",
                   transition: "all 0.25s ease",
                   cursor: "default",
@@ -697,25 +692,25 @@ function ServicesSection() {
               >
                 <div
                   style={{
-                    width: "52px",
-                    height: "52px",
-                    borderRadius: "14px",
+                    width: "48px",
+                    height: "48px",
+                    borderRadius: "13px",
                     background: "linear-gradient(135deg,#f0fdf4,#dcfce7)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    marginBottom: "20px",
+                    marginBottom: "16px",
                   }}
                 >
-                  <Icon size={24} color="#3d845b" />
+                  <Icon size={22} color="#3d845b" />
                 </div>
                 <h3
                   style={{
                     fontFamily: "var(--font-fraunces)",
-                    fontSize: "1.15rem",
+                    fontSize: "1.1rem",
                     fontWeight: 700,
                     color: "#1a1208",
-                    marginBottom: "10px",
+                    marginBottom: "8px",
                   }}
                 >
                   {s.title}
@@ -723,7 +718,7 @@ function ServicesSection() {
                 <p
                   style={{
                     fontFamily: "var(--font-dm-sans)",
-                    fontSize: "0.88rem",
+                    fontSize: "0.85rem",
                     color: "#8a7a60",
                     lineHeight: 1.65,
                     margin: 0,
@@ -748,52 +743,47 @@ function StatsSection() {
     <section
       style={{
         background: "linear-gradient(135deg,#0a1a11,#0f2318)",
-        padding: "80px clamp(24px,6vw,80px)",
+        padding: "clamp(48px,8vw,80px) clamp(20px,6vw,80px)",
       }}
     >
-      <div
-        style={{
-          maxWidth: "1100px",
-          margin: "0 auto",
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))",
-          gap: "40px",
-        }}
-      >
-        {STATS.map((s, i) => (
-          <div
-            key={s.label}
-            data-reveal
-            className={`delay-${i * 100}`}
-            style={{ textAlign: "center" }}
-          >
-            <p
-              style={{
-                fontFamily: "var(--font-fraunces)",
-                fontSize: "clamp(2.4rem,5vw,3.4rem)",
-                fontWeight: 700,
-                color: "#80cc9c",
-                margin: "0 0 8px",
-                letterSpacing: "-0.02em",
-              }}
+      <div style={{ maxWidth: "1100px", margin: "0 auto" }}>
+        {/* carousel on mobile, 4-col grid on sm+ */}
+        <div className="land-stats-row">
+          {STATS.map((s, i) => (
+            <div
+              key={s.label}
+              data-reveal
+              className={`delay-${i * 100}`}
+              style={{ textAlign: "center" }}
             >
-              {s.n}
-            </p>
-            <p
-              style={{
-                fontFamily: "var(--font-dm-sans)",
-                fontSize: "0.88rem",
-                color: "rgba(255,255,255,0.55)",
-                margin: 0,
-                textTransform: "uppercase",
-                letterSpacing: "0.1em",
-                fontWeight: 600,
-              }}
-            >
-              {s.label}
-            </p>
-          </div>
-        ))}
+              <p
+                style={{
+                  fontFamily: "var(--font-fraunces)",
+                  fontSize: "clamp(2rem,5vw,3.4rem)",
+                  fontWeight: 700,
+                  color: "#80cc9c",
+                  margin: "0 0 8px",
+                  letterSpacing: "-0.02em",
+                }}
+              >
+                {s.n}
+              </p>
+              <p
+                style={{
+                  fontFamily: "var(--font-dm-sans)",
+                  fontSize: "0.82rem",
+                  color: "rgba(255,255,255,0.55)",
+                  margin: 0,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.1em",
+                  fontWeight: 600,
+                }}
+              >
+                {s.label}
+              </p>
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   );
@@ -815,17 +805,11 @@ function ScheduleSection({ onBook }: { onBook: () => void }) {
   return (
     <section
       id="horarios"
-      style={{ background: "#faf8f3", padding: "100px clamp(24px,6vw,80px)" }}
+      style={{ background: "#faf8f3", padding: "clamp(60px,10vw,100px) clamp(20px,6vw,80px)" }}
     >
       <div
-        style={{
-          maxWidth: "1100px",
-          margin: "0 auto",
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: "80px",
-          alignItems: "center",
-        }}
+        className="land-schedule-grid"
+        style={{ maxWidth: "1100px", margin: "0 auto" }}
       >
         <div data-reveal>
           <span
@@ -1068,19 +1052,12 @@ function Footer() {
       id="contacto"
       style={{
         background: "#061209",
-        padding: "60px clamp(24px,6vw,80px) 32px",
+        padding: "clamp(40px,8vw,60px) clamp(20px,6vw,80px) clamp(24px,4vw,32px)",
         borderTop: "1px solid rgba(61,132,91,0.15)",
       }}
     >
       <div style={{ maxWidth: "1100px", margin: "0 auto" }}>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "2fr 1fr 1fr",
-            gap: "48px",
-            marginBottom: "48px",
-          }}
-        >
+        <div className="land-footer-grid">
           <div>
             <Image
               src="/logo/logo_h.png"
@@ -1195,12 +1172,10 @@ function Footer() {
           </div>
         </div>
         <div
+          className="land-footer-bottom"
           style={{
             borderTop: "1px solid rgba(255,255,255,0.10)",
             paddingTop: "24px",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
           }}
         >
           <p

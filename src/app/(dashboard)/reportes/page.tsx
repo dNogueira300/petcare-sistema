@@ -173,15 +173,15 @@ export default function ReportesPage() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard icon={CalendarDays} label="Total citas" value={resumen.total} accent="#c48c34" accentBg="#fdf3dc" />
-        <StatCard icon={TrendingUp} label="Atendidas" value={resumen.por_estado.atendida ?? 0} accent="#3d845b" accentBg="#f0fdf4" />
-        <StatCard icon={Users} label="Clientes" value={resumen.total_clientes} accent="#2e6fa8" accentBg="#eff6ff" />
-        <StatCard icon={PawPrint} label="Mascotas" value={resumen.total_mascotas} accent="#8a5a9a" accentBg="#faf5ff" />
+      <div className="metric-carousel">
+        <div className="metric-carousel-item"><StatCard icon={CalendarDays} label="Total citas" value={resumen.total} accent="#c48c34" accentBg="#fdf3dc" /></div>
+        <div className="metric-carousel-item"><StatCard icon={TrendingUp} label="Atendidas" value={resumen.por_estado.atendida ?? 0} accent="#3d845b" accentBg="#f0fdf4" /></div>
+        <div className="metric-carousel-item"><StatCard icon={Users} label="Clientes" value={resumen.total_clientes} accent="#2e6fa8" accentBg="#eff6ff" /></div>
+        <div className="metric-carousel-item"><StatCard icon={PawPrint} label="Mascotas" value={resumen.total_mascotas} accent="#8a5a9a" accentBg="#faf5ff" /></div>
       </div>
 
       {/* Charts row */}
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"20px" }}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
 
         {/* Estado de citas */}
         <div style={{ background:"var(--card-bg)", border:"1px solid var(--card-border)", borderRadius:"12px",
@@ -242,8 +242,8 @@ export default function ReportesPage() {
         </div>
 
         {/* Por origen */}
-        <div style={{ background:"var(--card-bg)", border:"1px solid var(--card-border)", borderRadius:"12px",
-          padding:"22px", boxShadow:"0 1px 3px rgba(26,18,8,0.06)", gridColumn:"1 / -1" }}>
+        <div className="sm:col-span-2" style={{ background:"var(--card-bg)", border:"1px solid var(--card-border)", borderRadius:"12px",
+          padding:"22px", boxShadow:"0 1px 3px rgba(26,18,8,0.06)" }}>
           <p style={{ fontFamily:"var(--font-fraunces)", fontWeight:600, fontStyle:"italic", fontSize:"1rem",
             color:"#1a1208", margin:"0 0 20px" }}>Origen de las citas</p>
           <div style={{ display:"flex", flexWrap:"wrap", gap:"24px", alignItems:"center" }}>
@@ -286,7 +286,8 @@ export default function ReportesPage() {
             <p style={{ fontFamily:"var(--font-fraunces)", fontWeight:600, fontStyle:"italic", fontSize:"1rem",
               color:"#1a1208", margin:0 }}>Resumen por veterinario</p>
           </div>
-          <table style={{ width:"100%", borderCollapse:"collapse", fontSize:"0.85rem" }}>
+          <div style={{ overflowX: "auto" }}>
+          <table style={{ width:"100%", borderCollapse:"collapse", fontSize:"0.85rem", minWidth:"500px" }}>
             <thead>
               <tr style={{ background:"#f9f6f0" }}>
                 {["Veterinario","Total","Atendidas","Canceladas","Tasa de atención"].map(h=>(
@@ -318,6 +319,7 @@ export default function ReportesPage() {
               })}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 

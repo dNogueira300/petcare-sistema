@@ -52,10 +52,10 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           onCollapse={handleCollapse}
         />
         <main
+          className="main-content"
           style={{
             flex: 1,
             overflowY: "auto",
-            padding: "28px 28px 48px",
             background: "var(--bg)",
           }}
         >

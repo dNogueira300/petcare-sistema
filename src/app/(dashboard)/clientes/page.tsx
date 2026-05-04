@@ -148,8 +148,8 @@ export default function ClientesPage() {
       header: "Nombre",
       render: (c) => `${c.usuarios.nombre} ${c.usuarios.apellido}`,
     },
-    { key: "correo", header: "Correo", render: (c) => c.usuarios.correo },
-    { key: "telefono", header: "Teléfono" },
+    { key: "correo", header: "Correo", className: "hidden md:table-cell", render: (c) => c.usuarios.correo },
+    { key: "telefono", header: "Teléfono", className: "hidden sm:table-cell" },
     {
       key: "activo",
       header: "Estado",
@@ -197,15 +197,16 @@ export default function ClientesPage() {
   ];
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col gap-4 sm:gap-6">
+      <div className="flex items-center justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Clientes</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Clientes</h1>
           <p className="text-sm text-gray-500">Propietarios de mascotas registrados</p>
         </div>
         <Button onClick={() => setCreateOpen(true)}>
           <UserPlus className="size-4" />
-          Nuevo cliente
+          <span className="hidden sm:inline">Nuevo cliente</span>
+          <span className="sm:hidden">Nuevo</span>
         </Button>
       </div>
 

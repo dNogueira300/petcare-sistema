@@ -227,7 +227,7 @@ export default function CitasPage() {
       header: "Fecha",
       render: (c) => formatLima(`${c.fecha}T00:00:00`, "dd/MM/yyyy"),
     },
-    { key: "hora", header: "Hora", render: (c) => c.hora.slice(0, 5) },
+    { key: "hora", header: "Hora", className: "hidden sm:table-cell", render: (c) => c.hora.slice(0, 5) },
     {
       key: "mascota",
       header: "Mascota",
@@ -236,11 +236,12 @@ export default function CitasPage() {
     {
       key: "veterinario",
       header: "Veterinario",
+      className: "hidden md:table-cell",
       render: (c) => c.veterinarios
         ? `${c.veterinarios.usuarios.nombre} ${c.veterinarios.usuarios.apellido}`
         : "—",
     },
-    { key: "motivo", header: "Motivo" },
+    { key: "motivo", header: "Motivo", className: "hidden lg:table-cell" },
     {
       key: "estado",
       header: "Estado",
@@ -322,19 +323,20 @@ export default function CitasPage() {
   ];
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col gap-4 sm:gap-6">
+      <div className="flex items-center justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Citas</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Citas</h1>
           <p className="text-sm text-gray-500">Agenda de consultas veterinarias</p>
         </div>
         <Button onClick={() => setCreateOpen(true)}>
           <CalendarPlus className="size-4" />
-          Nueva cita
+          <span className="hidden sm:inline">Nueva cita</span>
+          <span className="sm:hidden">Nueva</span>
         </Button>
       </div>
 
-      <div className="w-48">
+      <div className="w-40 sm:w-48">
         <Select
           options={estadoOptions}
           value={estadoFilter}

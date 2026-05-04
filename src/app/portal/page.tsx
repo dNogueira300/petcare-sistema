@@ -532,6 +532,7 @@ export default function PortalPage() {
   const [bookingOpen, setBookingOpen] = useState(false);
   const [mascotaModalOpen, setMascotaModalOpen] = useState(false);
   const [rescheduleItem, setRescheduleItem] = useState<CitaRow | null>(null);
+  const [noMascotasAlert, setNoMascotasAlert] = useState(false);
 
   useEffect(() => {
     const stored = sessionStorage.getItem("petcare_user");
@@ -648,7 +649,10 @@ export default function PortalPage() {
           </div>
           {/* Action buttons */}
           <div style={{ display:"flex", gap:"10px", flexWrap:"wrap" }}>
-            <button onClick={() => setBookingOpen(true)}
+            <button onClick={() => {
+              if (mascotas.length === 0) { setNoMascotasAlert(true); return; }
+              setBookingOpen(true);
+            }}
               style={{ display:"flex", alignItems:"center", gap:"8px",
                 background:"linear-gradient(135deg,#c48c34,#a07028)", color:"#fff",
                 border:"none", cursor:"pointer", padding:"11px 20px", borderRadius:"10px",
@@ -695,10 +699,19 @@ export default function PortalPage() {
             {tab === "mascotas" && (
               <div>
                 {mascotas.length === 0 ? (
-                  <div style={{ textAlign:"center", padding:"60px 20px", color:"#8a7a60",
-                    fontFamily:"var(--font-dm-sans)", fontSize:"0.9rem" }}>
+                  <div style={{ textAlign:"center", padding:"60px 20px" }}>
                     <PawPrint size={40} color="#d9cfba" style={{ margin:"0 auto 12px", display:"block" }} />
-                    No tienes mascotas registradas aún. Contacta a la clínica para registrarla.
+                    <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.9rem", color:"#8a7a60",
+                      margin:"0 0 20px" }}>
+                      No tienes mascotas registradas aún.
+                    </p>
+                    <button onClick={() => setMascotaModalOpen(true)}
+                      style={{ display:"inline-flex", alignItems:"center", gap:"8px",
+                        background:"linear-gradient(135deg,#3d845b,#2d6647)", color:"#fff",
+                        border:"none", cursor:"pointer", padding:"11px 22px", borderRadius:"10px",
+                        fontFamily:"var(--font-dm-sans)", fontSize:"0.88rem", fontWeight:700 }}>
+                      <Plus size={15} /> Registrar mi primera mascota
+                    </button>
                   </div>
                 ) : (
                   <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))", gap:"20px" }}>
@@ -878,6 +891,67 @@ export default function PortalPage() {
                 fontFamily:"var(--font-dm-sans)", fontSize:"0.88rem", fontWeight:600 }}>
               Cerrar
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Sin mascotas — aviso antes de agendar */}
+      {noMascotasAlert && (
+        <div style={{ position:"fixed", inset:0, zIndex:200, display:"flex", alignItems:"center",
+          justifyContent:"center", padding:"16px" }}>
+          <div style={{ position:"absolute", inset:0, background:"rgba(6,18,9,0.7)", backdropFilter:"blur(8px)" }}
+            onClick={() => setNoMascotasAlert(false)} />
+          <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:"420px",
+            background:"#fff", borderRadius:"24px", overflow:"hidden",
+            boxShadow:"0 32px 80px rgba(10,26,17,0.4)" }}>
+            {/* Header */}
+            <div style={{ background:"linear-gradient(135deg,#0a1a11,#0f2318)", padding:"22px 24px",
+              display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+              <div style={{ display:"flex", alignItems:"center", gap:"12px" }}>
+                <div style={{ width:"38px", height:"38px", borderRadius:"10px",
+                  background:"rgba(196,140,52,0.18)", border:"1px solid rgba(196,140,52,0.3)",
+                  display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                  <PawPrint size={18} color="#c48c34" />
+                </div>
+                <p style={{ fontFamily:"var(--font-fraunces)", fontSize:"1.05rem", fontWeight:700,
+                  fontStyle:"italic", color:"#fff", margin:0 }}>
+                  Registra tu mascota primero
+                </p>
+              </div>
+              <button onClick={() => setNoMascotasAlert(false)}
+                style={{ background:"rgba(255,255,255,0.08)", border:"none", cursor:"pointer",
+                  width:"30px", height:"30px", borderRadius:"8px", display:"flex",
+                  alignItems:"center", justifyContent:"center", color:"rgba(255,255,255,0.5)" }}>
+                <X size={14} />
+              </button>
+            </div>
+            {/* Body */}
+            <div style={{ padding:"24px" }}>
+              <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.9rem", color:"#4a3d2e",
+                lineHeight:1.65, margin:"0 0 6px" }}>
+                Para agendar una cita necesitas tener al menos una mascota registrada en tu cuenta.
+              </p>
+              <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.85rem", color:"#8a7a60",
+                lineHeight:1.6, margin:"0 0 24px" }}>
+                Registra a tu mascota y luego podrás solicitar una cita con nuestros veterinarios.
+              </p>
+              <div style={{ display:"flex", gap:"10px" }}>
+                <button onClick={() => setNoMascotasAlert(false)}
+                  style={{ flex:1, height:"42px", borderRadius:"10px", border:"1.5px solid #e8e0d0",
+                    background:"#fdfaf5", color:"#4a3d2e", fontSize:"0.88rem", fontWeight:600,
+                    fontFamily:"var(--font-dm-sans)", cursor:"pointer" }}>
+                  Cancelar
+                </button>
+                <button onClick={() => { setNoMascotasAlert(false); setMascotaModalOpen(true); }}
+                  style={{ flex:1, height:"42px", borderRadius:"10px", border:"none",
+                    background:"linear-gradient(135deg,#3d845b,#2d6647)", color:"#fff",
+                    fontSize:"0.88rem", fontWeight:600, fontFamily:"var(--font-dm-sans)",
+                    cursor:"pointer", display:"flex", alignItems:"center",
+                    justifyContent:"center", gap:"6px" }}>
+                  <PawPrint size={14} /> Registrar mascota
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

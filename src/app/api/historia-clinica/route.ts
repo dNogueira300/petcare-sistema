@@ -59,8 +59,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const session = await getSessionUser();
-  if (!session || session.rol !== "veterinario") {
-    return NextResponse.json({ error: "Solo veterinarios pueden crear historias clínicas" }, { status: 403 });
+  if (!session || !["veterinario", "administrador"].includes(session.rol)) {
+    return NextResponse.json({ error: "No autorizado para crear historias clínicas" }, { status: 403 });
   }
 
   const body = await req.json();

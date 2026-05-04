@@ -158,6 +158,166 @@ h1, h2, h3, .font-display {
   50%       { transform: translateY(7px); opacity: 1; }
 }
 
+/* ── Main content responsive padding ── */
+.main-content {
+  padding: 16px 16px 40px;
+}
+@media (min-width: 640px) {
+  .main-content { padding: 24px 24px 48px; }
+}
+@media (min-width: 768px) {
+  .main-content { padding: 28px 28px 48px; }
+}
+
+/* ── Mobile metric carousel ── */
+.metric-carousel {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  gap: 12px;
+  padding-bottom: 8px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.metric-carousel::-webkit-scrollbar { display: none; }
+.metric-carousel-item {
+  scroll-snap-align: start;
+  flex-shrink: 0;
+  width: calc(50vw - 28px);
+  min-width: 140px;
+  max-width: 200px;
+}
+@media (min-width: 640px) {
+  .metric-carousel {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    overflow-x: visible;
+    scroll-snap-type: none;
+    gap: 16px;
+    padding-bottom: 0;
+  }
+  .metric-carousel-item {
+    width: auto;
+    min-width: 0;
+    max-width: none;
+  }
+}
+@media (min-width: 1280px) {
+  .metric-carousel {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* ── Landing responsive layouts ── */
+
+/* Services — carousel on mobile, 2-col sm, 3-col lg */
+.land-services-grid {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  gap: 20px;
+  padding-bottom: 12px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.land-services-grid::-webkit-scrollbar { display: none; }
+.land-services-grid > * {
+  scroll-snap-align: start;
+  flex-shrink: 0;
+  width: calc(80vw - 48px);
+  max-width: 300px;
+}
+@media (min-width: 640px) {
+  .land-services-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    overflow-x: visible;
+    scroll-snap-type: none;
+    padding-bottom: 0;
+  }
+  .land-services-grid > * { width: auto; max-width: none; }
+}
+@media (min-width: 1024px) {
+  .land-services-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* Stats — carousel on mobile, 4-col sm */
+.land-stats-row {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  gap: 28px;
+  padding-bottom: 8px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  justify-content: flex-start;
+}
+.land-stats-row::-webkit-scrollbar { display: none; }
+.land-stats-row > * {
+  scroll-snap-align: start;
+  flex-shrink: 0;
+  min-width: 160px;
+}
+@media (min-width: 640px) {
+  .land-stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    overflow-x: visible;
+    scroll-snap-type: none;
+    padding-bottom: 0;
+    justify-content: unset;
+  }
+  .land-stats-row > * { min-width: 0; }
+}
+
+/* Schedule — stack on mobile, side-by-side on md */
+.land-schedule-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 48px;
+  align-items: stretch;
+}
+@media (min-width: 768px) {
+  .land-schedule-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 60px;
+    align-items: center;
+  }
+}
+
+/* Footer — stack on mobile, 3-col on md */
+.land-footer-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  margin-bottom: 40px;
+}
+@media (min-width: 768px) {
+  .land-footer-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 48px;
+    margin-bottom: 48px;
+  }
+}
+
+/* Footer bottom row — stack on mobile */
+.land-footer-bottom {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  text-align: center;
+}
+@media (min-width: 640px) {
+  .land-footer-bottom {
+    flex-direction: row;
+    justify-content: space-between;
+    text-align: left;
+  }
+}
+
 /* Scroll-reveal base state */
 [data-reveal] {
   opacity: 0;

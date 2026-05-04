@@ -62,7 +62,7 @@ export default function DashboardPage() {
   const greeting = hour < 12 ? "Buenos días" : hour < 19 ? "Buenas tardes" : "Buenas noches";
 
   return (
-    <div className="flex flex-col gap-7 animate-fade-up">
+    <div className="flex flex-col gap-4 sm:gap-7 animate-fade-up">
 
       {/* ── Header ── */}
       <div>
@@ -72,7 +72,7 @@ export default function DashboardPage() {
         <h1
           style={{
             fontFamily: "var(--font-fraunces)",
-            fontSize: "1.9rem",
+            fontSize: "clamp(1.4rem, 4vw, 1.9rem)",
             fontWeight: 500,
             fontStyle: "italic",
             color: "#1a1208",
@@ -84,8 +84,8 @@ export default function DashboardPage() {
         </h1>
       </div>
 
-      {/* ── Metric cards ── */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {/* ── Metric cards — carousel on mobile, grid on sm+ ── */}
+      <div className="metric-carousel">
         {[
           { icon: CalendarDays, label: "Citas hoy",   value: metrics.citas_hoy,      accent: "#c48c34", accentBg: "#fdf3dc" },
           { icon: Clock,        label: "Esta semana", value: metrics.citas_semana,   accent: "#3d845b", accentBg: "#f0fdf4" },
@@ -94,37 +94,37 @@ export default function DashboardPage() {
         ].map(({ icon: Icon, label, value, accent, accentBg }, i) => (
           <div
             key={label}
-            className={`delay-${i + 1} animate-fade-up`}
+            className={`metric-carousel-item delay-${i + 1} animate-fade-up`}
             style={{
               background: "var(--card-bg)",
               border: "1px solid var(--card-border)",
               borderRadius: "12px",
-              padding: "20px",
+              padding: "16px",
               boxShadow: "0 1px 3px rgba(26,18,8,0.06)",
               display: "flex",
               alignItems: "center",
-              gap: "16px",
+              gap: "12px",
             }}
           >
             <div
               style={{
-                width: "44px", height: "44px",
-                borderRadius: "11px",
+                width: "40px", height: "40px",
+                borderRadius: "10px",
                 background: accentBg,
                 display: "flex", alignItems: "center", justifyContent: "center",
                 flexShrink: 0,
               }}
             >
-              <Icon style={{ width: "20px", height: "20px", color: accent }} />
+              <Icon style={{ width: "18px", height: "18px", color: accent }} />
             </div>
-            <div>
-              <p style={{ fontSize: "0.72rem", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "#8a7a60", fontFamily: "var(--font-dm-sans)", margin: 0 }}>
+            <div style={{ minWidth: 0 }}>
+              <p style={{ fontSize: "0.65rem", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "#8a7a60", fontFamily: "var(--font-dm-sans)", margin: 0, whiteSpace: "nowrap" }}>
                 {label}
               </p>
               <p
                 style={{
                   fontFamily: "var(--font-fraunces)",
-                  fontSize: "1.75rem",
+                  fontSize: "1.6rem",
                   fontWeight: 700,
                   color: "#1a1208",
                   lineHeight: 1.1,
@@ -139,7 +139,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Lower grid ── */}
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-1 lg:grid-cols-3">
 
         {/* Citas hoy (span 2) */}
         <div

@@ -161,13 +161,14 @@ export default function MascotasPage() {
   const columns: Column<MascotaRow>[] = [
     { key: "nombre", header: "Nombre" },
     { key: "especie", header: "Especie" },
-    { key: "raza", header: "Raza", render: (m) => m.raza ?? "—" },
+    { key: "raza", header: "Raza", className: "hidden sm:table-cell", render: (m) => m.raza ?? "—" },
     {
       key: "propietario",
       header: "Propietario",
+      className: "hidden md:table-cell",
       render: (m) => m.clientes ? `${m.clientes.usuarios.nombre} ${m.clientes.usuarios.apellido}` : "—",
     },
-    { key: "edad", header: "Edad", render: (m) => calcEdad(m.fecha_nacimiento) },
+    { key: "edad", header: "Edad", className: "hidden sm:table-cell", render: (m) => calcEdad(m.fecha_nacimiento) },
     {
       key: "acciones",
       header: "Acciones",
@@ -195,15 +196,16 @@ export default function MascotasPage() {
   ];
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col gap-4 sm:gap-6">
+      <div className="flex items-center justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Mascotas</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Mascotas</h1>
           <p className="text-sm text-gray-500">Pacientes registrados en la clínica</p>
         </div>
         <Button onClick={() => setCreateOpen(true)}>
           <PawPrint className="size-4" />
-          Nueva mascota
+          <span className="hidden sm:inline">Nueva mascota</span>
+          <span className="sm:hidden">Nueva</span>
         </Button>
       </div>
 
