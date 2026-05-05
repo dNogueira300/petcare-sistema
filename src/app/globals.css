@@ -330,3 +330,44 @@ h1, h2, h3, .font-display {
 [data-reveal].delay-300 { transition-delay: 300ms; }
 [data-reveal].delay-400 { transition-delay: 400ms; }
 [data-reveal].delay-500 { transition-delay: 500ms; }
+
+/* ── Print / PDF styles ─────────────────────────────────────────────────────── */
+.print-header { display: none; }
+
+@media print {
+  /* Hide dashboard chrome */
+  aside[data-sidebar],
+  header { display: none !important; }
+
+  /* Remove dashboard layout constraints */
+  body { background: #fff !important; }
+  .main-content {
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* Show print-only header */
+  .print-header { display: block !important; }
+
+  /* Hide screen-only elements */
+  .no-print { display: none !important; }
+
+  /* Clean up cards for print */
+  * {
+    box-shadow: none !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Tables: avoid breaking rows */
+  table { page-break-inside: auto; }
+  tr    { page-break-inside: avoid; }
+  thead { display: table-header-group; }
+
+  /* Page setup */
+  @page {
+    size: A4 landscape;
+    margin: 15mm 12mm;
+  }
+}
+[data-reveal].delay-500 { transition-delay: 500ms; }
