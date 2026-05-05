@@ -8,7 +8,21 @@ const schema = z.object({
 });
 
 const GENERIC_MSG = "Si el correo está registrado, recibirás un enlace en los próximos minutos.";
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://petcare-sistema.vercel.app";
+
+/** Deriva la URL base del servidor desde los headers de la request.
+ *  Funciona correctamente en localhost, Vercel y cualquier otro host. */
+function getAppUrl(req: NextRequest): string {
+  // Vercel y proxies populares pasan estos headers
+  const forwardedHost  = req.headers.get("x-forwarded-host");
+  const forwardedProto = req.headers.get("x-forwarded-proto");
+  const host           = req.headers.get("host");
+
+  const resolvedHost  = forwardedHost ?? host ?? "localhost:3000";
+  const resolvedProto = forwardedProto?.split(",")[0].trim()
+    ?? (resolvedHost.startsWith("localhost") ? "http" : "https");
+
+  return `${resolvedProto}://${resolvedHost}`;
+}
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
@@ -38,7 +52,7 @@ export async function POST(req: NextRequest) {
       .update({ reset_token: token, reset_token_expires_at: expires })
       .eq("id_usuario", usuario.id_usuario);
 
-    const resetUrl = `${APP_URL}/reset-password?token=${token}`;
+    const resetUrl = `${getAppUrl(req)}/reset-password?token=${token}`;
 
     await sendResetPassword({
       nombreUsuario: usuario.nombre,
