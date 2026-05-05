@@ -1,30 +1,14 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { BarChart2, Users, PawPrint, CalendarDays, TrendingUp, Filter, Printer } from "lucide-react";
-import Image from "next/image";
+import { Users, PawPrint, CalendarDays, TrendingUp, Filter, FileDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { PageLoading } from "@/components/ui/loading";
 import { formatLima } from "@/utils/datetime";
-import type { EstadoCita } from "@/types";
-
-/* ═══ Types ═══ */
-interface Resumen { total: number; por_estado: Record<string,number>; total_clientes: number; total_mascotas: number; }
-interface VetRow { nombre: string; total: number; atendidas: number; canceladas: number; }
-interface DiaRow { dia: string; cantidad: number; }
-interface EspecieRow { especie: string; cantidad: number; }
-interface CitaDetalle {
-  id_cita: number; fecha: string; hora: string; motivo: string; estado: EstadoCita;
-  mascotas: { nombre: string; especie: string; clientes: { usuarios: { nombre: string; apellido: string } } | null } | null;
-  veterinarios: { usuarios: { nombre: string; apellido: string } } | null;
-}
-interface OrigenRow { origen: string; cantidad: number; }
-interface ReportData { resumen: Resumen; por_veterinario: VetRow[]; por_dia: DiaRow[]; por_especie: EspecieRow[]; por_origen: OrigenRow[]; citas: CitaDetalle[]; }
-
-interface VetOption { id_veterinario: number; usuarios: { nombre: string; apellido: string } }
+import type { ReportData, VetOption } from "@/types/reportes";
 
 const estadoLabels: Record<string, string> = { pendiente:"Pendiente", confirmada:"Confirmada", cancelada:"Cancelada", atendida:"Atendida" };
-const estadoColors: Record<string, string> = { pendiente:"#f59e0b", confirmada:"#22c55e", cancelada:"#f43f5e", atendida:"#3b82f6" };
+const estadoColors: Record<string, string>  = { pendiente:"#f59e0b", confirmada:"#22c55e", cancelada:"#f43f5e", atendida:"#3b82f6" };
 
 /* ═══ Bar chart component ═══ */
 function BarChart({ data, maxVal, color = "#3d845b" }: { data: {label:string; value:number}[]; maxVal: number; color?: string }) {
@@ -74,12 +58,12 @@ export default function ReportesPage() {
   const today = new Date().toISOString().slice(0,10);
   const firstOfMonth = `${today.slice(0,7)}-01`;
 
-  const [filters, setFilters] = useState({ desde:firstOfMonth, hasta:today, estado:"", id_veterinario:"" });
+  const [filters, setFilters] = useState<{ desde:string; hasta:string; estado:string; id_veterinario:string }>({ desde:firstOfMonth, hasta:today, estado:"", id_veterinario:"" });
+  const [pdfLoading, setPdfLoading] = useState(false);
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [vets, setVets] = useState<VetOption[]>([]);
   const [citaPage, setCitaPage] = useState(1);
-  const [printMode, setPrintMode] = useState(false);
   const PAGE_SIZE = 10;
 
   useEffect(() => {
@@ -102,10 +86,17 @@ export default function ReportesPage() {
 
   const setFilter = (k: keyof typeof filters, v: string) => setFilters(f => ({ ...f, [k]:v }));
 
-  const handlePrint = () => {
-    setPrintMode(true);
-    window.addEventListener("afterprint", () => setPrintMode(false), { once: true });
-    setTimeout(() => window.print(), 80);
+  const handleDescargarPdf = async () => {
+    if (!data) return;
+    setPdfLoading(true);
+    try {
+      const { generarReportePDF } = await import("@/utils/reportePdf");
+      await generarReportePDF(filters, data, vets);
+    } catch (err) {
+      console.error("Error al generar PDF:", err);
+    } finally {
+      setPdfLoading(false);
+    }
   };
 
   if (loading || !data) return <PageLoading />;
@@ -114,83 +105,44 @@ export default function ReportesPage() {
   const maxVet = Math.max(...por_veterinario.map(v=>v.total), 1);
   const maxDia = Math.max(...por_dia.map(d=>d.cantidad), 1);
 
-  const pagedCitas = printMode ? citas : citas.slice((citaPage-1)*PAGE_SIZE, citaPage*PAGE_SIZE);
+  const pagedCitas = citas.slice((citaPage-1)*PAGE_SIZE, citaPage*PAGE_SIZE);
   const totalPages = Math.ceil(citas.length / PAGE_SIZE);
-
-  // Texto del filtro activo para el encabezado PDF
-  const vetName = filters.id_veterinario
-    ? vets.find(v => String(v.id_veterinario) === filters.id_veterinario)
-    : null;
-
-  const formatFecha = (iso: string) => {
-    const [y,m,d] = iso.split("-");
-    return `${d}/${m}/${y}`;
-  };
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:"24px" }}>
-
-      {/* ── Encabezado solo visible al imprimir ── */}
-      <div className="print-header" style={{ borderBottom:"2px solid #2d6a4f", paddingBottom:"16px", marginBottom:"8px" }}>
-        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"12px" }}>
-          <Image src="/logo/logo_h.png" alt="PetCare" width={130} height={35} style={{ height:"auto" }} />
-          <div style={{ textAlign:"right" }}>
-            <p style={{ fontFamily:"Arial,sans-serif", fontSize:"10px", color:"#8a7a60", margin:0 }}>
-              Generado el {new Date().toLocaleDateString("es-PE", { day:"2-digit", month:"2-digit", year:"numeric" })}
-            </p>
-          </div>
-        </div>
-        <h1 style={{ fontFamily:"Georgia,serif", fontSize:"20px", fontWeight:700, color:"#1a1208", margin:"0 0 10px" }}>
-          Reporte de Citas — Veterinaria PetCare
-        </h1>
-        <div style={{ display:"flex", flexWrap:"wrap", gap:"16px" }}>
-          <span style={{ fontFamily:"Arial,sans-serif", fontSize:"11px", color:"#4a3d2e",
-            background:"#f0fdf4", border:"1px solid #86efac", borderRadius:"6px", padding:"4px 10px" }}>
-            📅 Período: {formatFecha(filters.desde)} — {formatFecha(filters.hasta)}
-          </span>
-          {filters.estado && (
-            <span style={{ fontFamily:"Arial,sans-serif", fontSize:"11px", color:"#4a3d2e",
-              background:"#eff6ff", border:"1px solid #93c5fd", borderRadius:"6px", padding:"4px 10px" }}>
-              Estado: {estadoLabels[filters.estado] ?? filters.estado}
-            </span>
-          )}
-          {vetName && (
-            <span style={{ fontFamily:"Arial,sans-serif", fontSize:"11px", color:"#4a3d2e",
-              background:"#fdf3dc", border:"1px solid #f0d080", borderRadius:"6px", padding:"4px 10px" }}>
-              Veterinario: {vetName.usuarios.nombre} {vetName.usuarios.apellido}
-            </span>
-          )}
-          {!filters.estado && !vetName && (
-            <span style={{ fontFamily:"Arial,sans-serif", fontSize:"11px", color:"#8a7a60",
-              background:"#f9f6f0", border:"1px solid #e8e0d0", borderRadius:"6px", padding:"4px 10px" }}>
-              Sin filtros adicionales — mostrando todos los registros
-            </span>
-          )}
-        </div>
-      </div>
-
       {/* Header */}
-      <div className="no-print" style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:"12px" }}>
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:"12px" }}>
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Reportes</h1>
           <p className="text-sm text-gray-500">Estadísticas y análisis del sistema</p>
         </div>
-        <div style={{ display:"flex", gap:"8px" }}>
+        <div style={{ display:"flex", gap:"8px", flexWrap:"wrap" }}>
           <button onClick={loadData} style={{ display:"flex", alignItems:"center", gap:"6px",
             background:"#0a1a11", color:"#fff", border:"none", cursor:"pointer", padding:"9px 18px",
             borderRadius:"9px", fontFamily:"var(--font-dm-sans)", fontSize:"0.82rem", fontWeight:600 }}>
             <TrendingUp size={14} /> Actualizar
           </button>
-          <button onClick={handlePrint} style={{ display:"flex", alignItems:"center", gap:"6px",
-            background:"#2d6a4f", color:"#fff", border:"none", cursor:"pointer", padding:"9px 18px",
-            borderRadius:"9px", fontFamily:"var(--font-dm-sans)", fontSize:"0.82rem", fontWeight:600 }}>
-            <Printer size={14} /> Descargar PDF
+          <button
+            onClick={handleDescargarPdf}
+            disabled={pdfLoading}
+            style={{ display:"flex", alignItems:"center", gap:"6px",
+              background: pdfLoading ? "#3d845b" : "#2d6a4f", color:"#fff",
+              border:"none", cursor: pdfLoading ? "not-allowed" : "pointer",
+              padding:"9px 18px", borderRadius:"9px",
+              fontFamily:"var(--font-dm-sans)", fontSize:"0.82rem", fontWeight:600,
+              opacity: pdfLoading ? 0.75 : 1, transition:"opacity 0.15s" }}>
+            {pdfLoading
+              ? <><span style={{ width:"13px", height:"13px", border:"2px solid rgba(255,255,255,0.3)",
+                  borderTopColor:"#fff", borderRadius:"50%", display:"inline-block",
+                  animation:"spin 0.7s linear infinite" }} /> Generando…</>
+              : <><FileDown size={14} /> Descargar PDF</>
+            }
           </button>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="no-print" style={{ background:"var(--card-bg)", border:"1px solid var(--card-border)", borderRadius:"12px", padding:"18px 20px" }}>
+      <div style={{ background:"var(--card-bg)", border:"1px solid var(--card-border)", borderRadius:"12px", padding:"18px 20px" }}>
         {/* Header row */}
         <div style={{ display:"flex", alignItems:"center", gap:"6px", color:"#6b5c44", marginBottom:"14px" }}>
           <Filter size={14} />
@@ -438,8 +390,8 @@ export default function ReportesPage() {
             </tbody>
           </table>
         </div>
-        {totalPages > 1 && !printMode && (
-          <div className="no-print" style={{ padding:"14px 20px", borderTop:"1px solid var(--card-border)", display:"flex",
+        {totalPages > 1 && (
+          <div style={{ padding:"14px 20px", borderTop:"1px solid var(--card-border)", display:"flex",
             justifyContent:"space-between", alignItems:"center" }}>
             <span style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.8rem", color:"#8a7a60" }}>
               Página {citaPage} de {totalPages} · {citas.length} citas
