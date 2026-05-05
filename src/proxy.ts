@@ -1,6 +1,15 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/api/auth/login", "/api/public/", "/api/recordatorios"];
+const PUBLIC_PATHS = [
+  "/login",
+  "/forgot-password",
+  "/reset-password",
+  "/api/auth/login",
+  "/api/auth/forgot-password",
+  "/api/auth/reset-password",
+  "/api/public/",
+  "/api/recordatorios",
+];
 // La raíz "/" es la landing page pública — no requiere sesión
 const PUBLIC_EXACT = ["/"];
 
