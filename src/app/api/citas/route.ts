@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/utils/supabase/server";
 import { getSessionUser } from "@/lib/auth";
-import { hoyCimaFecha, esDentroDeHorario } from "@/utils/datetime";
+import { hoyCimaFecha } from "@/utils/datetime";
+import { slotsDisponiblesVet } from "@/lib/horarios";
 
 const createSchema = z.object({
   id_mascota: z.number().int().positive(),
@@ -85,27 +86,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No se pueden crear citas en fechas pasadas" }, { status: 400 });
   }
 
-  if (!esDentroDeHorario(parsed.data.fecha, parsed.data.hora)) {
+  const admin = createAdminClient();
+
+  const slots = await slotsDisponiblesVet(admin, parsed.data.id_veterinario, parsed.data.fecha);
+  if (slots.length === 0) {
     return NextResponse.json(
-      { error: "El horario seleccionado está fuera del horario de atención (Lun–Vie 7–13h y 15–20h, Sáb 8–15h, Dom cerrado)" },
+      { error: "El veterinario no atiende ese día" },
       { status: 400 }
     );
   }
-
-  const admin = createAdminClient();
-
-  const { data: existing } = await admin
-    .from("citas")
-    .select("id_cita")
-    .eq("id_veterinario", parsed.data.id_veterinario)
-    .eq("fecha", parsed.data.fecha)
-    .eq("hora", parsed.data.hora)
-    .neq("estado", "cancelada")
-    .single();
-
-  if (existing) {
+  if (!slots.includes(parsed.data.hora)) {
     return NextResponse.json(
-      { error: "El veterinario ya tiene una cita en ese horario" },
+      { error: "El horario seleccionado no está disponible para ese veterinario" },
       { status: 409 }
     );
   }

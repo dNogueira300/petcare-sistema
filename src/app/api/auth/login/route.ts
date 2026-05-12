@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { verifyCredentials } from "@/lib/auth";
+import { verifyCredentials, EMAIL_NOT_VERIFIED } from "@/lib/auth";
 import { createAdminClient } from "@/utils/supabase/server";
 import { cookies } from "next/headers";
 
@@ -45,7 +45,16 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const usuario = await verifyCredentials(correo, contrasena);
+    const resultado = await verifyCredentials(correo, contrasena);
+
+    if (resultado && "error" in resultado) {
+      return NextResponse.json(
+        { error: EMAIL_NOT_VERIFIED, correo },
+        { status: 403 },
+      );
+    }
+
+    const usuario = resultado;
 
     if (!usuario) {
       if (usuarioDB) {

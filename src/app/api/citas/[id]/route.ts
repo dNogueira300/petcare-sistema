@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/utils/supabase/server";
 import { getSessionUser } from "@/lib/auth";
-import { hoyCimaFecha, esDentroDeHorario } from "@/utils/datetime";
+import { hoyCimaFecha } from "@/utils/datetime";
+import { slotsDisponiblesVet } from "@/lib/horarios";
 
 const updateSchema = z.object({
   fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida"),
@@ -51,18 +52,11 @@ export async function PUT(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "No se pueden mover citas a fechas pasadas" }, { status: 400 });
   }
 
-  if (!esDentroDeHorario(parsed.data.fecha, parsed.data.hora)) {
-    return NextResponse.json(
-      { error: "Horario fuera del horario de atención (Lun–Vie 7–13h y 15–20h, Sáb 8–15h, Dom cerrado)" },
-      { status: 400 }
-    );
-  }
-
   const admin = createAdminClient();
 
   const { data: current } = await admin
     .from("citas")
-    .select("id_cita, id_veterinario, estado, mascotas(id_mascota, id_cliente)")
+    .select("id_cita, id_veterinario, fecha, hora, estado, mascotas(id_mascota, id_cliente)")
     .eq("id_cita", id)
     .single();
 
@@ -93,19 +87,16 @@ export async function PUT(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "No se puede editar una cita cancelada" }, { status: 400 });
   }
 
-  // Verificar disponibilidad excluyendo esta misma cita
-  const { data: conflict } = await admin
-    .from("citas")
-    .select("id_cita")
-    .eq("id_veterinario", current.id_veterinario)
-    .eq("fecha", parsed.data.fecha)
-    .eq("hora", parsed.data.hora)
-    .neq("estado", "cancelada")
-    .neq("id_cita", id)
-    .maybeSingle();
-
-  if (conflict) {
-    return NextResponse.json({ error: "El veterinario ya tiene una cita en ese horario" }, { status: 409 });
+  // No-op: misma fecha y hora
+  const horaActual = (current.hora as string).slice(0, 5);
+  if (!(current.fecha === parsed.data.fecha && horaActual === parsed.data.hora)) {
+    const slots = await slotsDisponiblesVet(admin, current.id_veterinario as number, parsed.data.fecha);
+    if (slots.length === 0) {
+      return NextResponse.json({ error: "El veterinario no atiende ese día" }, { status: 400 });
+    }
+    if (!slots.includes(parsed.data.hora)) {
+      return NextResponse.json({ error: "El horario seleccionado no está disponible" }, { status: 409 });
+    }
   }
 
   const { data, error } = await admin

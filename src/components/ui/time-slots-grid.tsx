@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { slotsDisponibles } from "@/utils/datetime";
 
 interface TimeSlotsGridProps {
   fecha: string;           // "YYYY-MM-DD"
@@ -11,28 +10,27 @@ interface TimeSlotsGridProps {
 }
 
 export function TimeSlotsGrid({ fecha, idVeterinario, selected, onSelect }: TimeSlotsGridProps) {
-  const [ocupadas, setOcupadas] = useState<string[]>([]);
+  const [slots, setSlots] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    if (!fecha || !idVeterinario) { setOcupadas([]); return; }
+    if (!fecha || !idVeterinario) { setSlots([]); setLoaded(false); return; }
     setLoading(true);
-    fetch(`/api/citas/ocupadas?id_veterinario=${idVeterinario}&fecha=${fecha}`)
+    setLoaded(false);
+    fetch(`/api/citas/slots?id_veterinario=${idVeterinario}&fecha=${fecha}`)
       .then((r) => r.json())
-      .then((j) => setOcupadas(j.ocupadas ?? []))
-      .catch(() => setOcupadas([]))
-      .finally(() => setLoading(false));
+      .then((j) => setSlots(j.slots ?? []))
+      .catch(() => setSlots([]))
+      .finally(() => { setLoading(false); setLoaded(true); });
   }, [fecha, idVeterinario]);
-
-  const slots = fecha ? slotsDisponibles(fecha) : [];
 
   if (!fecha) return null;
 
-  if (slots.length === 0) {
+  if (!idVeterinario) {
     return (
-      <p style={{ fontFamily: "var(--font-dm-sans)", fontSize: "0.82rem", color: "#a89a80",
-        padding: "10px 0" }}>
-        Los domingos no hay atención. Elige otro día.
+      <p style={{ fontFamily: "var(--font-dm-sans)", fontSize: "0.82rem", color: "#a89a80", padding: "10px 0" }}>
+        Selecciona primero un veterinario.
       </p>
     );
   }
@@ -50,43 +48,39 @@ export function TimeSlotsGrid({ fecha, idVeterinario, selected, onSelect }: Time
     );
   }
 
+  if (loaded && slots.length === 0) {
+    return (
+      <p style={{ fontFamily: "var(--font-dm-sans)", fontSize: "0.82rem", color: "#dc2626", padding: "10px 0" }}>
+        El veterinario no atiende este día o no quedan horarios disponibles. Elige otra fecha.
+      </p>
+    );
+  }
+
   return (
     <div style={{ textAlign: "center" }}>
       <p style={{ fontFamily: "var(--font-dm-sans)", fontSize: "0.72rem", fontWeight: 700,
-        letterSpacing: "0.08em", textTransform: "uppercase", color: "#8a7a60",
-        marginBottom: "10px" }}>
+        letterSpacing: "0.08em", textTransform: "uppercase", color: "#8a7a60", marginBottom: "10px" }}>
         Horarios disponibles
       </p>
       <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", justifyContent: "center" }}>
         {slots.map((slot) => {
-          const taken = ocupadas.includes(slot);
           const active = selected === slot;
           return (
             <button
               key={slot}
               type="button"
-              disabled={taken}
-              onClick={() => !taken && onSelect(slot)}
+              onClick={() => onSelect(slot)}
               style={{
                 width: "72px",
                 height: "38px",
                 borderRadius: "8px",
-                border: active
-                  ? "2px solid #3d845b"
-                  : taken
-                  ? "1.5px solid #e8e0d0"
-                  : "1.5px solid #b8e4c9",
-                background: active
-                  ? "#0a1a11"
-                  : taken
-                  ? "#f5f0e8"
-                  : "#f0fdf4",
-                color: active ? "#f2e8d5" : taken ? "#c4b89c" : "#1a6040",
+                border: active ? "2px solid #3d845b" : "1.5px solid #b8e4c9",
+                background: active ? "#0a1a11" : "#f0fdf4",
+                color: active ? "#f2e8d5" : "#1a6040",
                 fontSize: "0.8rem",
                 fontWeight: active ? 700 : 500,
                 fontFamily: "var(--font-dm-sans)",
-                cursor: taken ? "not-allowed" : "pointer",
-                textDecoration: taken ? "line-through" : "none",
+                cursor: "pointer",
                 transition: "all 0.15s",
               }}
             >
@@ -95,12 +89,6 @@ export function TimeSlotsGrid({ fecha, idVeterinario, selected, onSelect }: Time
           );
         })}
       </div>
-      {slots.every((s) => ocupadas.includes(s)) && (
-        <p style={{ fontFamily: "var(--font-dm-sans)", fontSize: "0.82rem", color: "#dc2626",
-          marginTop: "10px", textAlign: "center" }}>
-          No hay horarios disponibles para este día. Elige otra fecha.
-        </p>
-      )}
     </div>
   );
 }

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PawPrint, Eye, Pencil } from "lucide-react";
+import Link from "next/link";
+import { PawPrint, Eye, Pencil, Syringe } from "lucide-react";
 import { Table, type Column } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
@@ -181,6 +182,13 @@ export default function MascotasPage() {
           >
             <Eye className="size-4" />
           </button>
+          <Link
+            href={`/mascotas/${m.id_mascota}/cartilla`}
+            title="Cartilla de vacunas"
+            className="rounded-lg p-1.5 text-gray-400 hover:bg-petcare-50 hover:text-petcare-600 transition-colors"
+          >
+            <Syringe className="size-4" />
+          </Link>
           {isAdmin && (
             <button
               onClick={() => setEditItem(m)}

@@ -11,6 +11,7 @@ import {
   PawPrint,
   FileText,
   UserCog,
+  Stethoscope,
   BarChart2,
   ChevronLeft,
   ChevronRight,
@@ -43,6 +44,7 @@ const navItems: NavItem[] = [
     module: "historia-clinica",
   },
   { href: "/usuarios", icon: UserCog, label: "Usuarios", module: "usuarios" },
+  { href: "/veterinarios", icon: Stethoscope, label: "Veterinarios", module: "veterinarios" },
   { href: "/reportes", icon: BarChart2, label: "Reportes", module: "reportes" },
 ];
 

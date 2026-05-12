@@ -1,17 +1,27 @@
+import { randomBytes } from "crypto";
 import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
+import { sendVerificacionCorreo } from "@/lib/mailer";
 import type { Usuario } from "@/types";
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://petcare-sistema.vercel.app";
+
+export const EMAIL_NOT_VERIFIED = "EMAIL_NOT_VERIFIED" as const;
+
+export type VerifyCredentialsResult =
+  | Usuario
+  | { error: typeof EMAIL_NOT_VERIFIED }
+  | null;
 
 export async function verifyCredentials(
   correo: string,
   contrasena: string,
-): Promise<Usuario | null> {
+): Promise<VerifyCredentialsResult> {
   try {
     const cookieStore = await cookies();
     const supabase = createClient(cookieStore);
 
-    // Usa maybeSingle() en lugar de single() para manejar mejor los casos
     const { data: usuario, error } = await supabase
       .from("usuarios")
       .select("*")
@@ -29,15 +39,15 @@ export async function verifyCredentials(
       return null;
     }
 
-    console.log(
-      `[AUTH] Usuario encontrado: ${usuario.correo} (id: ${usuario.id_usuario})`,
-    );
-
     const valid = await bcrypt.compare(contrasena, usuario.contrasena_hash);
-
     if (!valid) {
       console.log(`[AUTH] Contraseña inválida para: ${correo}`);
       return null;
+    }
+
+    if (usuario.correo_verificado === false) {
+      console.log(`[AUTH] Correo no verificado para: ${correo}`);
+      return { error: EMAIL_NOT_VERIFIED };
     }
 
     console.log(`[AUTH] Login exitoso para: ${correo}`);
@@ -61,4 +71,28 @@ export async function getSessionUser(): Promise<Usuario | null> {
   } catch {
     return null;
   }
+}
+
+/* ─── A.3 — Verificación de correo ────────────────────────────────────────── */
+
+/** Token aleatorio de 64 bytes en hexadecimal (128 chars). */
+export function generarTokenVerificacion(): string {
+  return randomBytes(64).toString("hex");
+}
+
+/** Fecha de expiración (ISO) a 48 h a partir de ahora. */
+export function expiracionTokenVerificacion(): string {
+  return new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+}
+
+export async function enviarCorreoVerificacion(
+  usuario: { nombre: string; correo: string },
+  token: string,
+): Promise<void> {
+  const verifyUrl = `${APP_URL}/api/auth/verify?token=${encodeURIComponent(token)}`;
+  await sendVerificacionCorreo({
+    correoUsuario: usuario.correo,
+    nombreUsuario: usuario.nombre,
+    verifyUrl,
+  });
 }

@@ -1,7 +1,7 @@
 import type { Rol } from "@/types";
 
 const permissions: Record<Rol, string[]> = {
-  administrador: ["dashboard", "citas", "clientes", "mascotas", "historia-clinica", "usuarios", "reportes"],
+  administrador: ["dashboard", "citas", "clientes", "mascotas", "historia-clinica", "usuarios", "veterinarios", "reportes"],
   veterinario:   ["dashboard", "citas", "mascotas", "historia-clinica"],
   recepcionista: ["dashboard", "citas", "clientes", "mascotas"],
   cliente:       [],

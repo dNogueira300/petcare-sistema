@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
 
   const { data, error } = await supabase
     .from("usuarios")
-    .insert({ ...rest, contrasena_hash })
+    .insert({ ...rest, contrasena_hash, correo_verificado: true })
     .select("id_usuario, nombre, apellido, correo, rol, activo, creado_en")
     .single();
 

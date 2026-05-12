@@ -34,6 +34,10 @@ export function LoginForm() {
   const { login } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [notVerifiedEmail, setNotVerifiedEmail] = useState<string | null>(null);
+  const [resendMsg, setResendMsg] = useState<string | null>(null);
+  const [resending, setResending] = useState(false);
+  const verifiedParam = params.get("verified");
 
   const {
     register,
@@ -43,15 +47,40 @@ export function LoginForm() {
 
   const onSubmit = async (data: FormData) => {
     setError(null);
+    setNotVerifiedEmail(null);
+    setResendMsg(null);
     const err = await login(data.correo, data.contrasena);
     if (err) {
-      setError(err);
+      if (err === "EMAIL_NOT_VERIFIED") {
+        setNotVerifiedEmail(data.correo);
+      } else {
+        setError(err);
+      }
       return;
     }
     const stored = sessionStorage.getItem("petcare_user");
     const u = stored ? JSON.parse(stored) : null;
     const dest = u?.rol === "cliente" ? "/portal" : (params.get("next") ?? "/dashboard");
     router.push(dest);
+  };
+
+  const handleResend = async () => {
+    if (!notVerifiedEmail) return;
+    setResending(true);
+    setResendMsg(null);
+    try {
+      const res = await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ correo: notVerifiedEmail }),
+      });
+      const j = await res.json();
+      setResendMsg(j.message ?? j.error ?? "Correo enviado, revisa tu bandeja.");
+    } catch {
+      setResendMsg("No se pudo enviar el correo. Intenta más tarde.");
+    } finally {
+      setResending(false);
+    }
   };
 
   return (
@@ -351,6 +380,45 @@ export function LoginForm() {
                   />
                 </svg>
               </button>
+            </div>
+          )}
+
+          {/* Correo verificado correctamente */}
+          {verifiedParam === "1" && !notVerifiedEmail && (
+            <div className="mb-6 rounded-xl px-4 py-3 text-sm animate-fade-up"
+              style={{ background: "#f0fdf4", border: "1px solid #86efac", color: "#166534", fontFamily: "var(--font-dm-sans)" }}>
+              ¡Correo verificado! Ya puedes iniciar sesión.
+            </div>
+          )}
+          {verifiedParam === "0" && !notVerifiedEmail && (
+            <div className="mb-6 rounded-xl px-4 py-3 text-sm animate-fade-up"
+              style={{ background: "#fff5f5", border: "1px solid #fecaca", color: "#991b1b", fontFamily: "var(--font-dm-sans)" }}>
+              El enlace de verificación no es válido o ha expirado. Inicia sesión y solicita uno nuevo.
+            </div>
+          )}
+
+          {/* Correo no verificado */}
+          {notVerifiedEmail && (
+            <div className="mb-6 rounded-xl px-4 py-3 text-sm animate-fade-up"
+              style={{ background: "#fffbeb", border: "1px solid #fcd34d", color: "#92400e", fontFamily: "var(--font-dm-sans)" }}>
+              <p style={{ margin: "0 0 8px", fontWeight: 600 }}>
+                Debes verificar tu correo antes de iniciar sesión.
+              </p>
+              <button
+                type="button"
+                onClick={handleResend}
+                disabled={resending}
+                style={{
+                  background: "#d4a017", color: "#fff", border: "none", borderRadius: "8px",
+                  padding: "8px 14px", fontSize: "0.8rem", fontWeight: 700, cursor: resending ? "not-allowed" : "pointer",
+                  fontFamily: "var(--font-dm-sans)", opacity: resending ? 0.7 : 1,
+                }}
+              >
+                {resending ? "Enviando…" : "Reenviar correo de verificación"}
+              </button>
+              {resendMsg && (
+                <p style={{ margin: "10px 0 0", color: "#166534" }}>{resendMsg}</p>
+              )}
             </div>
           )}
 

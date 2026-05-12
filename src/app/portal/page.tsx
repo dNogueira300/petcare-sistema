@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { PawPrint, CalendarDays, FileText, LogOut, User, ChevronRight, X, CalendarPlus, CheckCircle, Plus, CalendarClock } from "lucide-react";
+import { PawPrint, CalendarDays, FileText, LogOut, User, ChevronRight, X, CalendarPlus, CheckCircle, Plus, CalendarClock, Syringe } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
 import { AvailabilityCalendar } from "@/components/ui/availability-calendar";
@@ -65,6 +65,12 @@ function MascotaCard({ m }: { m: MascotaRow }) {
           </div>
         ))}
       </div>
+      <Link href={`/portal/mascotas/${m.id_mascota}/cartilla`}
+        style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:"6px",
+          background:"#f0fdf4", border:"1px solid #bbf7d0", color:"#16a34a", textDecoration:"none",
+          padding:"8px", borderRadius:"9px", fontFamily:"var(--font-dm-sans)", fontSize:"0.8rem", fontWeight:600 }}>
+        <Syringe size={13} /> Ver cartilla de vacunas
+      </Link>
     </div>
   );
 }

@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/utils/supabase/server";
-import { hashPassword } from "@/lib/auth";
+import {
+  hashPassword,
+  generarTokenVerificacion,
+  expiracionTokenVerificacion,
+  enviarCorreoVerificacion,
+} from "@/lib/auth";
 import { passwordSchema } from "@/utils/password";
 
 const schema = z.object({
@@ -27,9 +32,19 @@ export async function POST(req: NextRequest) {
   const contrasena_hash = await hashPassword(contrasena);
   const supabase = createAdminClient();
 
+  const token_verificacion = generarTokenVerificacion();
+  const token_expira = expiracionTokenVerificacion();
+
   const { data: usuario, error: uError } = await supabase
     .from("usuarios")
-    .insert({ ...userData, contrasena_hash, rol: "cliente" })
+    .insert({
+      ...userData,
+      contrasena_hash,
+      rol: "cliente",
+      correo_verificado: false,
+      token_verificacion,
+      token_expira,
+    })
     .select("id_usuario")
     .single();
 
@@ -46,5 +61,15 @@ export async function POST(req: NextRequest) {
 
   if (cError) return NextResponse.json({ error: cError.message }, { status: 500 });
 
-  return NextResponse.json({ ok: true }, { status: 201 });
+  try {
+    await enviarCorreoVerificacion({ nombre: userData.nombre, correo: userData.correo }, token_verificacion);
+  } catch (err) {
+    console.error("[REGISTER] Error enviando correo de verificación:", err);
+    // El registro ya se creó; el cliente puede reenviar el correo desde el login.
+  }
+
+  return NextResponse.json(
+    { ok: true, message: "Registro exitoso. Revisa tu correo para verificar tu cuenta." },
+    { status: 201 },
+  );
 }
