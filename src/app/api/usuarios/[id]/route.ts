@@ -9,6 +9,7 @@ const updateSchema = z.object({
   apellido: z.string().min(2).optional(),
   correo: z.string().email().optional(),
   rol: z.enum(["administrador", "veterinario", "recepcionista"]).optional(),
+  especialidad: z.string().optional(),
 });
 
 type Params = { params: Promise<{ id: string }> };
@@ -44,15 +45,48 @@ export async function PUT(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { data, error } = await createAdminClient()
-    .from("usuarios")
-    .update(parsed.data)
-    .eq("id_usuario", id)
-    .select("id_usuario, nombre, apellido, correo, rol, activo, creado_en")
-    .single();
+  const supabase = createAdminClient();
+  const { especialidad, ...userFields } = parsed.data;
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ data });
+  let data;
+  if (Object.keys(userFields).length > 0) {
+    const res = await supabase
+      .from("usuarios")
+      .update(userFields)
+      .eq("id_usuario", id)
+      .select("id_usuario, nombre, apellido, correo, rol, activo, creado_en")
+      .single();
+    if (res.error) return NextResponse.json({ error: res.error.message }, { status: 500 });
+    data = res.data;
+  } else {
+    const res = await supabase
+      .from("usuarios")
+      .select("id_usuario, nombre, apellido, correo, rol, activo, creado_en")
+      .eq("id_usuario", id)
+      .single();
+    if (res.error) return NextResponse.json({ error: res.error.message }, { status: 500 });
+    data = res.data;
+  }
+
+  if (data.rol === "veterinario" && especialidad !== undefined) {
+    const { data: vetRow } = await supabase
+      .from("veterinarios")
+      .select("id_veterinario")
+      .eq("id_usuario", id)
+      .maybeSingle();
+    if (vetRow) {
+      await supabase.from("veterinarios").update({ especialidad: especialidad || null }).eq("id_usuario", id);
+    } else {
+      await supabase.from("veterinarios").insert({
+        id_usuario: Number(id),
+        especialidad: especialidad || null,
+        horario_inicio: "07:00",
+        horario_fin: "20:00",
+      });
+    }
+  }
+
+  return NextResponse.json({ data: { ...data, especialidad: especialidad ?? null } });
 }
 
 export async function PATCH(req: NextRequest, { params }: Params) {

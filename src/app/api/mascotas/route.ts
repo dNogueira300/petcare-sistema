@@ -10,8 +10,9 @@ const createSchema = z.object({
   nombre: z.string().min(1),
   especie: z.string().min(1),
   raza: z.string().optional(),
+  sexo: z.enum(["macho", "hembra"]).optional(),
+  color: z.string().optional(),
   fecha_nacimiento: z.string().optional(),
-  peso: z.number().positive().optional(),
 });
 
 export async function GET(req: NextRequest) {
@@ -26,7 +27,7 @@ export async function GET(req: NextRequest) {
   let query = supabase
     .from("mascotas")
     .select(
-      "id_mascota, nombre, especie, raza, fecha_nacimiento, peso, creado_en, clientes(id_cliente, usuarios(nombre, apellido))"
+      "id_mascota, nombre, especie, raza, sexo, color, fecha_nacimiento, peso, creado_en, clientes(id_cliente, usuarios(nombre, apellido))"
     )
     .order("creado_en", { ascending: false });
 

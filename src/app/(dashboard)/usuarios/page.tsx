@@ -19,6 +19,7 @@ interface Usuario {
   rol: string;
   activo: boolean;
   creado_en: string;
+  especialidad?: string | null;
 }
 
 const rolLabels: Record<string, string> = {
@@ -203,6 +204,9 @@ export default function UsuariosPage() {
             <DetailRow label="Correo" value={detailItem.correo} />
             <DetailRow label="Rol" value={rolLabels[detailItem.rol] ?? detailItem.rol} />
             <DetailRow label="Estado" value={detailItem.activo ? "Activo" : "Inactivo"} />
+            {detailItem.rol === "veterinario" && (
+              <DetailRow label="Especialidad" value={detailItem.especialidad ?? "—"} />
+            )}
           </div>
         )}
       </Modal>
@@ -217,6 +221,7 @@ export default function UsuariosPage() {
               apellido: editItem.apellido,
               correo: editItem.correo,
               rol: editItem.rol as "administrador" | "veterinario" | "recepcionista",
+              especialidad: editItem.especialidad ?? "",
             }}
             onSubmit={handleEdit as never}
           />

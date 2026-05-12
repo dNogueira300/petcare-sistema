@@ -9,6 +9,7 @@ const PUBLIC_PATHS = [
   "/api/auth/reset-password",
   "/api/auth/verify",
   "/api/auth/resend-verification",
+  "/api/auth/session",
   "/api/public/",
   "/api/recordatorios",
 ];

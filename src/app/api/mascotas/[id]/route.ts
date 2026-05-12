@@ -7,8 +7,9 @@ const updateSchema = z.object({
   nombre: z.string().min(1).optional(),
   especie: z.string().optional(),
   raza: z.string().optional(),
+  sexo: z.enum(["macho", "hembra"]).optional(),
+  color: z.string().optional(),
   fecha_nacimiento: z.string().optional(),
-  peso: z.number().positive().optional(),
 });
 
 type Params = { params: Promise<{ id: string }> };

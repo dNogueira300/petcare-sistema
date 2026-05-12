@@ -39,10 +39,15 @@ CREATE TABLE IF NOT EXISTS mascotas (
   nombre           VARCHAR(100) NOT NULL,
   especie          VARCHAR(50)  NOT NULL,
   raza             VARCHAR(100),
+  sexo             VARCHAR(10),                 -- 'macho' | 'hembra'
+  color            VARCHAR(60),
   fecha_nacimiento DATE,
-  peso             DECIMAL(5,2),
+  peso             DECIMAL(5,2),                -- último peso conocido; el detalle por consulta vive en historia_clinica
   creado_en        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+-- Migración si la tabla ya existe:
+ALTER TABLE IF EXISTS mascotas ADD COLUMN IF NOT EXISTS sexo  VARCHAR(10);
+ALTER TABLE IF EXISTS mascotas ADD COLUMN IF NOT EXISTS color VARCHAR(60);
 
 -- ─── ENTIDAD: citas ─────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS citas (

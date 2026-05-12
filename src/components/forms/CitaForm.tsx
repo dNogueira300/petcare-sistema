@@ -96,6 +96,8 @@ export function CitaForm({ onSubmit }: CitaFormProps) {
     label: `${v.usuarios.nombre} ${v.usuarios.apellido}`,
   }));
 
+  const vetReg = register("id_veterinario");
+
   return (
     <form onSubmit={handleSubmit(submit)} className="flex flex-col gap-5">
       <Select
@@ -104,13 +106,6 @@ export function CitaForm({ onSubmit }: CitaFormProps) {
         placeholder="Seleccionar mascota…"
         error={errors.id_mascota?.message}
         {...register("id_mascota")}
-      />
-      <Select
-        label="Veterinario"
-        options={vetOptions}
-        placeholder="Seleccionar veterinario…"
-        error={errors.id_veterinario?.message}
-        {...register("id_veterinario")}
       />
 
       {/* Calendar */}
@@ -129,12 +124,24 @@ export function CitaForm({ onSubmit }: CitaFormProps) {
         )}
       </div>
 
-      {/* Time slots grid */}
+      {/* Veterinario — se elige después de la fecha */}
       {selectedFecha && (
+        <Select
+          label="Veterinario"
+          options={vetOptions}
+          placeholder="Seleccionar veterinario…"
+          error={errors.id_veterinario?.message}
+          {...vetReg}
+          onChange={(e) => { vetReg.onChange(e); setValue("hora", "", { shouldValidate: false }); }}
+        />
+      )}
+
+      {/* Time slots grid — disponibilidad real del veterinario */}
+      {selectedFecha && selectedVetId && (
         <div>
           <TimeSlotsGrid
             fecha={selectedFecha}
-            idVeterinario={selectedVetId || 0}
+            idVeterinario={selectedVetId}
             selected={selectedHora ?? ""}
             onSelect={handleSlotSelect}
           />

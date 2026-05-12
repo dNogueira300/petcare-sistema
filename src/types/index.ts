@@ -42,8 +42,10 @@ export interface Mascota {
   nombre: string;
   especie: string;
   raza: string | null;
+  sexo: string | null;   // "macho" | "hembra"
+  color: string | null;
   fecha_nacimiento: string | null; // "YYYY-MM-DD"
-  peso: number | null;
+  peso: number | null;   // último peso conocido — el detalle por consulta vive en historia_clinica
   creado_en: string;
   cliente?: Cliente;
 }
@@ -155,8 +157,9 @@ export interface CrearMascotaDTO {
   nombre: string;
   especie: string;
   raza?: string;
+  sexo?: "macho" | "hembra";
+  color?: string;
   fecha_nacimiento?: string;
-  peso?: number;
 }
 
 export interface CrearHistoriaClinicaDTO {

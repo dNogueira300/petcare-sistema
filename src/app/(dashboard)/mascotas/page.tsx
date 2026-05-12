@@ -16,12 +16,15 @@ interface MascotaRow {
   nombre: string;
   especie: string;
   raza: string | null;
+  sexo: string | null;
+  color: string | null;
   fecha_nacimiento: string | null;
-  peso: number | null;
   clientes: {
     usuarios: { nombre: string; apellido: string };
   };
 }
+
+const SEXO_LABEL: Record<string, string> = { macho: "Macho", hembra: "Hembra" };
 
 function calcEdad(fechaNac: string | null): string {
   if (!fechaNac) return "—";
@@ -57,14 +60,21 @@ function EditMascotaForm({ mascota, onSubmit }: { mascota: MascotaRow; onSubmit:
   const [nombre, setNombre] = useState(mascota.nombre);
   const [especie, setEspecie] = useState(mascota.especie);
   const [raza, setRaza] = useState(mascota.raza ?? "");
+  const [sexo, setSexo] = useState(mascota.sexo ?? "");
+  const [color, setColor] = useState(mascota.color ?? "");
   const [fechaNac, setFechaNac] = useState(mascota.fecha_nacimiento ?? "");
-  const [peso, setPeso] = useState(mascota.peso ? String(mascota.peso) : "");
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
-    await onSubmit({ nombre, especie, raza: raza || undefined, fecha_nacimiento: fechaNac || undefined, peso: peso ? Number(peso) : undefined });
+    await onSubmit({
+      nombre, especie,
+      raza: raza || undefined,
+      sexo: sexo || undefined,
+      color: color || undefined,
+      fecha_nacimiento: fechaNac || undefined,
+    });
     setSubmitting(false);
   };
 
@@ -90,14 +100,23 @@ function EditMascotaForm({ mascota, onSubmit }: { mascota: MascotaRow; onSubmit:
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-gray-700">Fecha de nacimiento</label>
-          <input type="date" value={fechaNac} onChange={(e) => setFechaNac(e.target.value)} className={inputCls} />
+          <label className="text-sm font-medium text-gray-700">Sexo</label>
+          <select value={sexo} onChange={(e) => setSexo(e.target.value)} className={inputCls}>
+            <option value="">Sin especificar</option>
+            <option value="macho">Macho</option>
+            <option value="hembra">Hembra</option>
+          </select>
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-gray-700">Peso (kg)</label>
-          <input type="number" step="0.01" value={peso} onChange={(e) => setPeso(e.target.value)} className={inputCls} />
+          <label className="text-sm font-medium text-gray-700">Color</label>
+          <input value={color} onChange={(e) => setColor(e.target.value)} className={inputCls} placeholder="Ej: marrón y blanco" />
         </div>
       </div>
+      <div className="flex flex-col gap-1">
+        <label className="text-sm font-medium text-gray-700">Fecha de nacimiento</label>
+        <input type="date" value={fechaNac} onChange={(e) => setFechaNac(e.target.value)} className={inputCls} />
+      </div>
+      <p className="text-xs text-gray-400">El peso se registra en la historia clínica de cada consulta.</p>
       <div style={{ position:"sticky", bottom:0, background:"#fff",
         borderTop:"1px solid #f0ead8", padding:"12px 0 16px", marginTop:"4px" }}>
         <Button type="submit" loading={submitting} className="w-full">Guardar cambios</Button>
@@ -229,9 +248,10 @@ export default function MascotasPage() {
             <DetailRow label="Nombre" value={detailItem.nombre} />
             <DetailRow label="Especie" value={detailItem.especie} />
             <DetailRow label="Raza" value={detailItem.raza ?? "—"} />
+            <DetailRow label="Sexo" value={detailItem.sexo ? (SEXO_LABEL[detailItem.sexo] ?? detailItem.sexo) : "—"} />
+            <DetailRow label="Color" value={detailItem.color ?? "—"} />
             <DetailRow label="Propietario" value={detailItem.clientes ? `${detailItem.clientes.usuarios.nombre} ${detailItem.clientes.usuarios.apellido}` : "—"} />
             <DetailRow label="Fecha de nacimiento" value={detailItem.fecha_nacimiento ?? "—"} />
-            <DetailRow label="Peso" value={detailItem.peso ? `${detailItem.peso} kg` : "—"} />
             <DetailRow label="Edad" value={calcEdad(detailItem.fecha_nacimiento)} />
           </div>
         )}

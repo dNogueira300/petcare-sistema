@@ -10,6 +10,7 @@ const createSchema = z.object({
   correo: z.string().email(),
   contrasena: passwordSchema,
   rol: z.enum(["administrador", "veterinario", "recepcionista"]),
+  especialidad: z.string().optional(),
 });
 
 export async function GET() {
@@ -20,12 +21,20 @@ export async function GET() {
 
   const { data, error } = await createAdminClient()
     .from("usuarios")
-    .select("id_usuario, nombre, apellido, correo, rol, activo, creado_en")
+    .select("id_usuario, nombre, apellido, correo, rol, activo, creado_en, veterinarios(especialidad)")
     .not("rol", "eq", "cliente")
     .order("creado_en", { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ data });
+
+  const flat = (data ?? []).map((u: Record<string, unknown>) => {
+    const vet = u.veterinarios as { especialidad: string | null }[] | { especialidad: string | null } | null;
+    const especialidad = Array.isArray(vet) ? (vet[0]?.especialidad ?? null) : (vet?.especialidad ?? null);
+    const { veterinarios: _v, ...rest } = u;
+    return { ...rest, especialidad };
+  });
+
+  return NextResponse.json({ data: flat });
 }
 
 export async function POST(req: NextRequest) {
@@ -40,7 +49,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { contrasena, ...rest } = parsed.data;
+  const { contrasena, especialidad, ...rest } = parsed.data;
   const contrasena_hash = await hashPassword(contrasena);
 
   const supabase = createAdminClient();
@@ -61,8 +70,13 @@ export async function POST(req: NextRequest) {
   if (data.rol === "veterinario") {
     await supabase
       .from("veterinarios")
-      .insert({ id_usuario: data.id_usuario, horario_inicio: "07:00", horario_fin: "20:00" });
+      .insert({
+        id_usuario: data.id_usuario,
+        especialidad: especialidad || null,
+        horario_inicio: "07:00",
+        horario_fin: "20:00",
+      });
   }
 
-  return NextResponse.json({ data }, { status: 201 });
+  return NextResponse.json({ data: { ...data, especialidad: especialidad || null } }, { status: 201 });
 }

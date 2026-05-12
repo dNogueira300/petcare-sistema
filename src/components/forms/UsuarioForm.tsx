@@ -14,6 +14,7 @@ const baseFields = {
   apellido: z.string().min(2, "Mínimo 2 caracteres"),
   correo: z.string().email("Correo inválido"),
   rol: z.enum(["administrador", "veterinario", "recepcionista"]),
+  especialidad: z.string().optional(),
 };
 
 const createSchema = z.object({
@@ -62,6 +63,7 @@ export function UsuarioForm({
     name: "contrasena" as never,
     defaultValue: "",
   }) as string;
+  const rolValue = useWatch({ control, name: "rol" as never }) as string | undefined;
   const e = errors as Record<string, { message?: string }>;
 
   return (
@@ -102,6 +104,14 @@ export function UsuarioForm({
         error={e.rol?.message}
         {...register("rol")}
       />
+      {rolValue === "veterinario" && (
+        <Input
+          label="Especialidad (opcional)"
+          placeholder="Ej: Cirugía, Dermatología…"
+          error={e.especialidad?.message}
+          {...register("especialidad")}
+        />
+      )}
       <div
         style={{
           position: "sticky",

@@ -13,8 +13,9 @@ const schema = z.object({
   nombre: z.string().min(1, "Campo requerido"),
   especie: z.string().min(1, "Selecciona una especie"),
   raza: z.string().optional(),
+  sexo: z.string().optional(),
+  color: z.string().optional(),
   fecha_nacimiento: z.string().optional(),
-  peso: z.string().optional(),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -26,6 +27,11 @@ const especieOptions = [
   { value: "Conejo", label: "Conejo" },
   { value: "Reptil", label: "Reptil" },
   { value: "Otro", label: "Otro" },
+];
+
+const sexoOptions = [
+  { value: "macho", label: "Macho" },
+  { value: "hembra", label: "Hembra" },
 ];
 
 interface MascotaFormProps {
@@ -60,7 +66,8 @@ export function MascotaForm({ defaultClienteId, onSubmit }: MascotaFormProps) {
     await onSubmit({
       ...data,
       id_cliente: Number(data.id_cliente),
-      peso: data.peso ? Number(data.peso) : undefined,
+      sexo: data.sexo || undefined,
+      color: data.color || undefined,
     });
   };
 
@@ -90,19 +97,21 @@ export function MascotaForm({ defaultClienteId, onSubmit }: MascotaFormProps) {
         <Input label="Raza (opcional)" {...register("raza")} />
       </div>
       <div className="grid grid-cols-2 gap-4">
-        <Input
-          label="Fecha de nacimiento"
-          type="date"
-          {...register("fecha_nacimiento")}
+        <Select
+          label="Sexo"
+          options={sexoOptions}
+          placeholder="Seleccionar…"
+          error={errors.sexo?.message}
+          {...register("sexo")}
         />
-        <Input
-          label="Peso (kg)"
-          type="number"
-          step="0.01"
-          placeholder="0.00"
-          {...register("peso")}
-        />
+        <Input label="Color (opcional)" placeholder="Ej: marrón y blanco" {...register("color")} />
       </div>
+      <Input
+        label="Fecha de nacimiento (opcional)"
+        type="date"
+        {...register("fecha_nacimiento")}
+      />
+      <p className="text-xs text-gray-400">El peso se registra en la historia clínica de cada consulta.</p>
       <div style={{ position:"sticky", bottom:0, background:"#fff",
         borderTop:"1px solid #f0ead8", padding:"12px 0 16px", marginTop:"4px" }}>
         <Button type="submit" loading={isSubmitting} className="w-full">

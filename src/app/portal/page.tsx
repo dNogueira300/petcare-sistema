@@ -12,7 +12,8 @@ import { formatLima } from "@/utils/datetime";
 import type { EstadoCita } from "@/types";
 
 /* ═══ types ═══ */
-interface MascotaRow { id_mascota: number; nombre: string; especie: string; raza: string | null; fecha_nacimiento: string | null; peso: number | null; }
+interface MascotaRow { id_mascota: number; nombre: string; especie: string; raza: string | null; sexo: string | null; color: string | null; fecha_nacimiento: string | null; peso: number | null; }
+const SEXO_LABEL: Record<string, string> = { macho: "Macho", hembra: "Hembra" };
 interface CitaRow { id_cita: number; id_veterinario: number; fecha: string; hora: string; motivo: string; estado: EstadoCita; mascotas: { nombre: string; especie: string }; veterinarios: { usuarios: { nombre: string; apellido: string } }; }
 interface HistoriaRow { id_historia: number; fecha_consulta: string; diagnostico: string; tratamiento: string; observaciones: string | null; peso_consulta: number | null; mascotas: { nombre: string }; veterinarios: { usuarios: { nombre: string; apellido: string } }; }
 interface VetOption { id_veterinario: number; usuarios: { nombre: string; apellido: string } }
@@ -54,11 +55,11 @@ function MascotaCard({ m }: { m: MascotaRow }) {
         </div>
         <div>
           <p style={{ fontFamily:"var(--font-fraunces)", fontSize:"1.1rem", fontWeight:700, color:"#1a1208", margin:0 }}>{m.nombre}</p>
-          <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.82rem", color:"#8a7a60", margin:0 }}>{m.especie}{m.raza ? ` · ${m.raza}` : ""}</p>
+          <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.82rem", color:"#8a7a60", margin:0 }}>{m.especie}{m.raza ? ` · ${m.raza}` : ""}{m.color ? ` · ${m.color}` : ""}</p>
         </div>
       </div>
       <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"8px" }}>
-        {[["Edad", calcEdad(m.fecha_nacimiento)], ["Peso", m.peso ? `${m.peso} kg` : "—"]].map(([l,v])=>(
+        {[["Edad", calcEdad(m.fecha_nacimiento)], ["Sexo", m.sexo ? (SEXO_LABEL[m.sexo] ?? m.sexo) : "—"]].map(([l,v])=>(
           <div key={l} style={{ background:"#faf6ef", borderRadius:"8px", padding:"10px 12px" }}>
             <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.7rem", fontWeight:600, color:"#8a7a60", textTransform:"uppercase", letterSpacing:"0.08em", margin:0 }}>{l}</p>
             <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.9rem", fontWeight:600, color:"#1a1208", margin:0 }}>{v}</p>
@@ -84,8 +85,9 @@ function RegisterMascotaModal({ open, onClose, onCreated }: {
   const [nombre, setNombre] = useState("");
   const [especie, setEspecie] = useState("Perro");
   const [raza, setRaza] = useState("");
+  const [sexo, setSexo] = useState("macho");
+  const [color, setColor] = useState("");
   const [fechaNac, setFechaNac] = useState("");
-  const [peso, setPeso] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
@@ -93,7 +95,7 @@ function RegisterMascotaModal({ open, onClose, onCreated }: {
   const [prevOpen, setPrevOpen] = useState(open);
   if (prevOpen !== open) {
     setPrevOpen(open);
-    if (open) { setNombre(""); setEspecie("Perro"); setRaza(""); setFechaNac(""); setPeso(""); setError(null); setDone(false); }
+    if (open) { setNombre(""); setEspecie("Perro"); setRaza(""); setSexo("macho"); setColor(""); setFechaNac(""); setError(null); setDone(false); }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -104,7 +106,7 @@ function RegisterMascotaModal({ open, onClose, onCreated }: {
       const res = await fetch("/api/mascotas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nombre, especie, raza: raza || undefined, fecha_nacimiento: fechaNac || undefined, peso: peso ? Number(peso) : undefined }),
+        body: JSON.stringify({ nombre, especie, raza: raza || undefined, sexo, color: color || undefined, fecha_nacimiento: fechaNac || undefined }),
       });
       const json = await res.json();
       if (!res.ok) { setError(json.error ?? "Error al registrar"); return; }
@@ -171,14 +173,24 @@ function RegisterMascotaModal({ open, onClose, onCreated }: {
               </div>
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px" }}>
                 <div>
-                  <label style={labelS}>Fecha de nacimiento</label>
-                  <input type="date" value={fechaNac} onChange={e=>setFechaNac(e.target.value)} style={inputS} />
+                  <label style={labelS}>Sexo</label>
+                  <select value={sexo} onChange={e=>setSexo(e.target.value)} style={inputS}>
+                    <option value="macho">Macho</option>
+                    <option value="hembra">Hembra</option>
+                  </select>
                 </div>
                 <div>
-                  <label style={labelS}>Peso (kg)</label>
-                  <input type="number" step="0.01" value={peso} onChange={e=>setPeso(e.target.value)} style={inputS} placeholder="0.00" />
+                  <label style={labelS}>Color (opcional)</label>
+                  <input value={color} onChange={e=>setColor(e.target.value)} style={inputS} placeholder="Ej: marrón y blanco" />
                 </div>
               </div>
+              <div>
+                <label style={labelS}>Fecha de nacimiento (opcional)</label>
+                <input type="date" value={fechaNac} onChange={e=>setFechaNac(e.target.value)} style={inputS} />
+              </div>
+              <p style={{ fontSize:"0.74rem", color:"#a89a80", fontFamily:"var(--font-dm-sans)", margin:0 }}>
+                El peso se registra en la historia clínica de cada consulta.
+              </p>
               {error && <p style={{ fontSize:"0.82rem", color:"#dc2626", fontFamily:"var(--font-dm-sans)" }}>{error}</p>}
               <div style={{ position:"sticky", bottom:0, background:"#fff",
                 borderTop:"1px solid #f0ead8", padding:"12px 0 4px", marginTop:"4px" }}>
@@ -463,11 +475,19 @@ function BookingModal({ open, onClose, mascotas, onBooked }: {
                 </select>
               </div>
 
-              {/* Veterinario */}
-              {vets.length > 1 && (
+              {/* Calendario */}
+              <div>
+                <label style={labelStyle}>Fecha</label>
+                <AvailabilityCalendar selected={selectedDay} onSelect={handleDaySelect} />
+              </div>
+
+              {/* Veterinario — se elige después de la fecha */}
+              {fecha && (
                 <div>
                   <label style={labelStyle}>Veterinario</label>
-                  <select style={selectStyle} value={idVet} onChange={e=>setIdVet(e.target.value)}>
+                  <select style={selectStyle} value={idVet}
+                    onChange={e=>{ setIdVet(e.target.value); setHora(""); }}>
+                    <option value="">Seleccionar veterinario…</option>
                     {vets.map(v => (
                       <option key={v.id_veterinario} value={v.id_veterinario}>
                         {v.usuarios.nombre} {v.usuarios.apellido}
@@ -477,17 +497,11 @@ function BookingModal({ open, onClose, mascotas, onBooked }: {
                 </div>
               )}
 
-              {/* Calendario */}
-              <div>
-                <label style={labelStyle}>Fecha</label>
-                <AvailabilityCalendar selected={selectedDay} onSelect={handleDaySelect} />
-              </div>
-
-              {/* Grid de horarios */}
-              {fecha && (
+              {/* Grid de horarios — disponibilidad real del veterinario */}
+              {fecha && idVet && (
                 <TimeSlotsGrid
                   fecha={fecha}
-                  idVeterinario={idVet || 0}
+                  idVeterinario={idVet}
                   selected={hora}
                   onSelect={setHora}
                 />
@@ -539,12 +553,32 @@ export default function PortalPage() {
   const [mascotaModalOpen, setMascotaModalOpen] = useState(false);
   const [rescheduleItem, setRescheduleItem] = useState<CitaRow | null>(null);
   const [noMascotasAlert, setNoMascotasAlert] = useState(false);
+  const [verifiedBanner, setVerifiedBanner] = useState(false);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("verified") === "1") setVerifiedBanner(true);
+
     const stored = sessionStorage.getItem("petcare_user");
-    if (!stored) { window.location.href = "/"; return; }
-    const u = JSON.parse(stored) as { rol: string };
-    if (u.rol !== "cliente") { window.location.href = "/dashboard"; }
+    if (stored) {
+      const u = JSON.parse(stored) as { rol: string };
+      if (u.rol !== "cliente") { window.location.href = "/dashboard"; }
+      return;
+    }
+    // Sin sesión en sessionStorage — recuperar desde la cookie (p. ej. al verificar el correo)
+    fetch("/api/auth/session")
+      .then((r) => r.json())
+      .then((j) => {
+        if (j?.user?.rol === "cliente") {
+          sessionStorage.setItem("petcare_user", JSON.stringify(j.user));
+          window.location.reload();
+        } else if (j?.user) {
+          window.location.href = "/dashboard";
+        } else {
+          window.location.href = "/";
+        }
+      })
+      .catch(() => { window.location.href = "/"; });
   }, []);
 
   const loadTab = async (t: Tab) => {
@@ -630,6 +664,30 @@ export default function PortalPage() {
         <div style={{ background:"#faf8f3", border:"1px solid #e0d8ca",
           borderRadius:"20px", padding:"24px",
           boxShadow:"0 2px 12px rgba(26,18,8,0.07)" }}>
+
+        {/* ── Banner: correo verificado ── */}
+        {verifiedBanner && (
+          <div style={{ display:"flex", alignItems:"center", gap:"12px", marginBottom:"20px",
+            background:"#f0fdf4", border:"1px solid #86efac", borderRadius:"14px", padding:"14px 18px" }}>
+            <div style={{ width:"36px", height:"36px", borderRadius:"10px", background:"#dcfce7",
+              display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+              <CheckCircle size={20} color="#16a34a" />
+            </div>
+            <div style={{ flex:1 }}>
+              <p style={{ fontFamily:"var(--font-dm-sans)", fontWeight:700, color:"#166534", margin:0, fontSize:"0.92rem" }}>
+                ¡Correo verificado!
+              </p>
+              <p style={{ fontFamily:"var(--font-dm-sans)", color:"#15803d", margin:0, fontSize:"0.82rem" }}>
+                Tu cuenta quedó activada y ya iniciaste sesión. Bienvenido a tu portal.
+              </p>
+            </div>
+            <button onClick={() => setVerifiedBanner(false)}
+              style={{ background:"transparent", border:"none", cursor:"pointer", color:"#16a34a", padding:"4px",
+                display:"flex", alignItems:"center" }}>
+              <X size={16} />
+            </button>
+          </div>
+        )}
 
         {/* ── Hero card ── */}
         <div style={{ background:"linear-gradient(135deg,#0a1a11 0%,#133320 100%)",
