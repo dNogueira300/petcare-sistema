@@ -34,9 +34,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
 export async function PUT(req: NextRequest, { params }: Params) {
   const session = await getSessionUser();
-  if (!session || session.rol === "cliente") {
-    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
-  }
+  if (!session) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
 
   const { id } = await params;
   const body = await req.json();
@@ -45,7 +43,27 @@ export async function PUT(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { data, error } = await createAdminClient()
+  const supabase = createAdminClient();
+
+  if (session.rol === "cliente") {
+    const { data: cliente } = await supabase
+      .from("clientes")
+      .select("id_cliente")
+      .eq("id_usuario", session.id_usuario)
+      .single();
+    if (!cliente) return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
+
+    const { data: mascota } = await supabase
+      .from("mascotas")
+      .select("id_cliente")
+      .eq("id_mascota", id)
+      .single();
+    if (!mascota || mascota.id_cliente !== cliente.id_cliente) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    }
+  }
+
+  const { data, error } = await supabase
     .from("mascotas")
     .update(parsed.data)
     .eq("id_mascota", id)
