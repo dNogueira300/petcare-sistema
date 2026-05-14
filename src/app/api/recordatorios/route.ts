@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/utils/supabase/server";
 import { sendRecordatorioCita, sendRecordatorioVacuna } from "@/lib/mailer";
-import { formatLima, hoyCimaFecha } from "@/utils/datetime";
+import { formatLima, hoyCimaFecha, format12h } from "@/utils/datetime";
 
 const DIAS_AVISO_VACUNA = Number(process.env.DIAS_AVISO_VACUNA ?? 3);
 
@@ -85,7 +85,7 @@ async function procesar(): Promise<Resumen> {
           nombreMascota: mascota?.nombre ?? "Tu mascota",
           especie: mascota?.especie ?? "",
           fechaFormateada: formatLima(`${cita.fecha}T00:00:00`, "dd/MM/yyyy"),
-          hora: (cita.hora as string).slice(0, 5),
+          hora: format12h(cita.hora as string),
           nombreVeterinario: nombreVet,
           correoCliente,
         });

@@ -3,14 +3,17 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Syringe, Plus, PawPrint } from "lucide-react";
+import { ArrowLeft, Plus, PawPrint } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { PageLoading } from "@/components/ui/loading";
+import { Table, type Column } from "@/components/ui/table";
 import { VacunaForm } from "@/components/forms/VacunaForm";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/context/toast";
 import { formatLima, hoyCimaFecha } from "@/utils/datetime";
+import { FRECUENCIA_LABEL, type Frecuencia } from "@/lib/vacunas";
+import { exportCartillaPdf } from "@/utils/cartillaPdf";
 import type { CartillaVacunacion } from "@/types";
 
 interface MascotaInfo {
@@ -18,8 +21,15 @@ interface MascotaInfo {
   nombre: string;
   especie: string;
   raza: string | null;
+  sexo?: string | null;
+  color?: string | null;
+  fecha_nacimiento?: string | null;
   clientes?: { usuarios: { nombre: string; apellido: string } };
 }
+
+type VacunaRow = CartillaVacunacion & {
+  veterinarios?: { usuarios?: { nombre: string; apellido: string } };
+};
 
 function diasHasta(fechaISO: string): number {
   const [hy, hm, hd] = hoyCimaFecha().split("-").map(Number);
@@ -41,7 +51,7 @@ export default function CartillaPage() {
   const puedeRegistrar = user?.rol === "administrador" || user?.rol === "veterinario" || user?.rol === "recepcionista";
 
   const [mascota, setMascota] = useState<MascotaInfo | null>(null);
-  const [vacunas, setVacunas] = useState<CartillaVacunacion[]>([]);
+  const [vacunas, setVacunas] = useState<VacunaRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
 
@@ -64,9 +74,26 @@ export default function CartillaPage() {
     .filter((v) => v.fecha_proxima_dosis)
     .sort((a, b) => (a.fecha_proxima_dosis! < b.fecha_proxima_dosis! ? -1 : 1));
 
+  const columns: Column<VacunaRow>[] = [
+    { key: "tipo", header: "Vacuna", render: (v) => <span className="font-medium text-gray-900">{v.tipo_vacuna}</span> },
+    { key: "aplicacion", header: "Fecha aplicación",
+      render: (v) => formatLima(`${v.fecha_aplicacion}T00:00:00`, "dd/MM/yyyy") },
+    { key: "proxima", header: "Próxima dosis",
+      render: (v) => v.fecha_proxima_dosis ? formatLima(`${v.fecha_proxima_dosis}T00:00:00`, "dd/MM/yyyy") : "—" },
+    { key: "frecuencia", header: "Frecuencia", className: "hidden sm:table-cell",
+      render: (v) => v.frecuencia ? FRECUENCIA_LABEL[v.frecuencia as Frecuencia] : "—" },
+    { key: "lote", header: "Lote", className: "hidden md:table-cell",
+      render: (v) => v.lote ?? "—" },
+    { key: "veterinario", header: "Veterinario", className: "hidden lg:table-cell",
+      render: (v) => v.veterinarios?.usuarios
+        ? `${v.veterinarios.usuarios.nombre} ${v.veterinarios.usuarios.apellido}` : "—" },
+    { key: "observaciones", header: "Observaciones", className: "hidden xl:table-cell",
+      render: (v) => v.observaciones ?? "—" },
+  ];
+
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <Link href="/mascotas" className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 transition-colors">
           <ArrowLeft className="size-5" />
         </Link>
@@ -84,16 +111,27 @@ export default function CartillaPage() {
             </p>
           </div>
         </div>
-        {puedeRegistrar && (
-          <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          <Button
+            onClick={() =>
+              exportCartillaPdf({
+                mascota: mascota ?? { id_mascota: Number(id), nombre: "Mascota", especie: "", raza: null },
+                vacunas,
+              })
+            }
+            disabled={vacunas.length === 0}
+            variant="outline"
+          >
+            Descargar PDF
+          </Button>
+          {puedeRegistrar && (
             <Button onClick={() => setFormOpen(true)}>
               <Plus className="size-4" /> Registrar vacuna
             </Button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
-      {/* Próximas dosis */}
       <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">Próximas dosis</h2>
         {proximas.length === 0 ? (
@@ -121,47 +159,15 @@ export default function CartillaPage() {
         )}
       </section>
 
-      {/* Historial de vacunas */}
       <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">Historial de vacunas</h2>
-        {vacunas.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-gray-200 p-8 text-center text-sm text-gray-400">
-            <Syringe className="mx-auto mb-2 size-7 text-gray-300" />
-            Aún no se han registrado vacunas para esta mascota.
-          </div>
-        ) : (
-          <div className="overflow-x-auto rounded-xl border border-gray-100">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
-                <tr>
-                  <th className="px-4 py-3">Vacuna</th>
-                  <th className="px-4 py-3">Fecha aplicación</th>
-                  <th className="px-4 py-3">Próxima dosis</th>
-                  <th className="px-4 py-3 hidden sm:table-cell">Lote</th>
-                  <th className="px-4 py-3 hidden md:table-cell">Veterinario</th>
-                  <th className="px-4 py-3 hidden lg:table-cell">Observaciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {vacunas.map((v) => {
-                  const vet = (v as unknown as { veterinarios?: { usuarios?: { nombre: string; apellido: string } } }).veterinarios;
-                  return (
-                    <tr key={v.id}>
-                      <td className="px-4 py-3 font-medium text-gray-900">{v.tipo_vacuna}</td>
-                      <td className="px-4 py-3 text-gray-700">{formatLima(`${v.fecha_aplicacion}T00:00:00`, "dd/MM/yyyy")}</td>
-                      <td className="px-4 py-3 text-gray-700">{v.fecha_proxima_dosis ? formatLima(`${v.fecha_proxima_dosis}T00:00:00`, "dd/MM/yyyy") : "—"}</td>
-                      <td className="px-4 py-3 text-gray-500 hidden sm:table-cell">{v.lote ?? "—"}</td>
-                      <td className="px-4 py-3 text-gray-500 hidden md:table-cell">
-                        {vet?.usuarios ? `${vet.usuarios.nombre} ${vet.usuarios.apellido}` : "—"}
-                      </td>
-                      <td className="px-4 py-3 text-gray-500 hidden lg:table-cell">{v.observaciones ?? "—"}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <Table
+          columns={columns}
+          data={vacunas}
+          keyField="id"
+          loading={false}
+          emptyMessage="Aún no se han registrado vacunas para esta mascota."
+        />
       </section>
 
       <Modal open={formOpen} onClose={() => setFormOpen(false)} title="Registrar nueva vacuna">

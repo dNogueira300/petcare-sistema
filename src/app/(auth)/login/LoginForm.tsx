@@ -38,6 +38,7 @@ export function LoginForm() {
   const [resendMsg, setResendMsg] = useState<string | null>(null);
   const [resending, setResending] = useState(false);
   const verifiedParam = params.get("verified");
+  const expiredParam = params.get("expired") === "1";
 
   const {
     register,
@@ -380,6 +381,14 @@ export function LoginForm() {
                   />
                 </svg>
               </button>
+            </div>
+          )}
+
+          {/* Sesión expirada */}
+          {expiredParam && !notVerifiedEmail && (
+            <div className="mb-6 rounded-xl px-4 py-3 text-sm animate-fade-up"
+              style={{ background: "#fffbeb", border: "1px solid #fcd34d", color: "#92400e", fontFamily: "var(--font-dm-sans)" }}>
+              Tu sesión expiró por inactividad. Vuelve a iniciar sesión.
             </div>
           )}
 

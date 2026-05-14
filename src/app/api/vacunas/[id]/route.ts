@@ -2,13 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/utils/supabase/server";
 import { getSessionUser } from "@/lib/auth";
-import { calcularProximaDosis } from "@/lib/vacunas";
+import { proximaDosisDesdeFrecuencia } from "@/lib/vacunas";
 
 const WRITE_ROLES = ["administrador", "veterinario", "recepcionista"];
+
+const frecuenciaEnum = z.enum([
+  "unica", "semanal", "21dias", "mensual", "trimestral", "semestral", "anual",
+]);
 
 const updateSchema = z.object({
   tipo_vacuna: z.string().min(2),
   fecha_aplicacion: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  frecuencia: frecuenciaEnum.nullable().optional(),
   lote: z.string().nullable().optional(),
   id_veterinario: z.number().int().positive().nullable().optional(),
   observaciones: z.string().nullable().optional(),
@@ -28,7 +33,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   }
 
   const supabase = createAdminClient();
-  const fechaProxima = await calcularProximaDosis(supabase, parsed.data.tipo_vacuna, parsed.data.fecha_aplicacion);
+  const frecuencia = parsed.data.frecuencia ?? null;
+  const fechaProxima = proximaDosisDesdeFrecuencia(parsed.data.fecha_aplicacion, frecuencia);
 
   const { data, error } = await supabase
     .from("cartilla_vacunacion")
@@ -39,6 +45,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       lote: parsed.data.lote ?? null,
       id_veterinario: parsed.data.id_veterinario ?? null,
       observaciones: parsed.data.observaciones ?? null,
+      frecuencia,
     })
     .eq("id", id)
     .select()

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { PawPrint, Eye, Pencil, Syringe } from "lucide-react";
+import { PawPrint, Eye, Pencil, Search } from "lucide-react";
 import { Table, type Column } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
@@ -128,6 +128,7 @@ function EditMascotaForm({ mascota, onSubmit }: { mascota: MascotaRow; onSubmit:
 export default function MascotasPage() {
   const [mascotas, setMascotas] = useState<MascotaRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [detailItem, setDetailItem] = useState<MascotaRow | null>(null);
   const [editItem, setEditItem] = useState<MascotaRow | null>(null);
@@ -193,7 +194,7 @@ export default function MascotasPage() {
       key: "acciones",
       header: "Acciones",
       render: (m) => (
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 flex-wrap">
           <button
             onClick={() => setDetailItem(m)}
             title="Ver detalle"
@@ -202,11 +203,16 @@ export default function MascotasPage() {
             <Eye className="size-4" />
           </button>
           <Link
-            href={`/mascotas/${m.id_mascota}/cartilla`}
-            title="Cartilla de vacunas"
-            className="rounded-lg p-1.5 text-gray-400 hover:bg-petcare-50 hover:text-petcare-600 transition-colors"
+            href={`/mascotas/${m.id_mascota}/historia-clinica`}
+            className="rounded px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 transition-colors whitespace-nowrap"
           >
-            <Syringe className="size-4" />
+            Ver historial clínico
+          </Link>
+          <Link
+            href={`/mascotas/${m.id_mascota}/cartilla`}
+            className="rounded px-2 py-1 text-xs font-medium text-petcare-700 hover:bg-petcare-50 transition-colors whitespace-nowrap"
+          >
+            Registrar vacuna
           </Link>
           {isAdmin && (
             <button
@@ -236,7 +242,31 @@ export default function MascotasPage() {
         </Button>
       </div>
 
-      <Table columns={columns} data={mascotas} keyField="id_mascota" loading={loading} emptyMessage="No hay mascotas registradas" />
+      <div className="relative w-full sm:w-96">
+        <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-gray-400" />
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar por mascota o propietario…"
+          className="h-10 w-full rounded-[9px] border border-gray-200 bg-white pl-9 pr-3 text-sm focus:border-petcare-500 focus:outline-none focus:ring-2 focus:ring-petcare-100"
+        />
+      </div>
+
+      <Table
+        columns={columns}
+        data={mascotas.filter((m) => {
+          const q = search.trim().toLowerCase();
+          if (!q) return true;
+          const propietario = m.clientes
+            ? `${m.clientes.usuarios.nombre} ${m.clientes.usuarios.apellido}`.toLowerCase()
+            : "";
+          return m.nombre.toLowerCase().includes(q) || propietario.includes(q);
+        })}
+        keyField="id_mascota"
+        loading={loading}
+        emptyMessage={search ? "Sin resultados para esa búsqueda" : "No hay mascotas registradas"}
+      />
 
       <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Nueva mascota">
         <MascotaForm onSubmit={handleCreate} />

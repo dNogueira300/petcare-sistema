@@ -4,11 +4,20 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowLeft, Syringe } from "lucide-react";
+import { ArrowLeft, Syringe, Download } from "lucide-react";
 import { formatLima, hoyCimaFecha } from "@/utils/datetime";
+import { exportCartillaPdf } from "@/utils/cartillaPdf";
 import type { CartillaVacunacion } from "@/types";
 
-interface MascotaInfo { nombre: string; especie: string; raza: string | null }
+interface MascotaInfo {
+  id_mascota: number;
+  nombre: string;
+  especie: string;
+  raza: string | null;
+  sexo?: string | null;
+  color?: string | null;
+  fecha_nacimiento?: string | null;
+}
 
 function diasHasta(fechaISO: string): number {
   const [hy, hm, hd] = hoyCimaFecha().split("-").map(Number);
@@ -61,12 +70,12 @@ export default function PortalCartillaPage() {
 
       <main style={{ maxWidth: "880px", margin: "0 auto", padding: "24px clamp(12px,3vw,32px)" }}>
         <div style={{ background: "#faf8f3", border: "1px solid #e0d8ca", borderRadius: "20px", padding: "24px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "20px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "20px", flexWrap: "wrap" }}>
             <div style={{ width: "52px", height: "52px", borderRadius: "14px", background: "linear-gradient(135deg,#f0fdf4,#dcfce7)",
               display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <Syringe size={24} color="#16a34a" />
             </div>
-            <div>
+            <div style={{ flex: 1, minWidth: 0 }}>
               <h1 style={{ fontFamily: "var(--font-fraunces)", fontStyle: "italic", fontSize: "1.5rem", fontWeight: 700, color: "#1a1208", margin: 0 }}>
                 Cartilla de vacunas{mascota ? ` — ${mascota.nombre}` : ""}
               </h1>
@@ -74,6 +83,25 @@ export default function PortalCartillaPage() {
                 {mascota ? `${mascota.especie}${mascota.raza ? ` · ${mascota.raza}` : ""}` : ""}
               </p>
             </div>
+            <button
+              onClick={() =>
+                exportCartillaPdf({
+                  mascota: mascota ?? { id_mascota: Number(id), nombre: "Mascota", especie: "", raza: null },
+                  vacunas,
+                })
+              }
+              disabled={vacunas.length === 0}
+              style={{
+                display: "flex", alignItems: "center", gap: "6px",
+                background: "#2d6a4f", color: "#fff", border: "none",
+                cursor: vacunas.length === 0 ? "not-allowed" : "pointer",
+                padding: "10px 16px", borderRadius: "9px",
+                fontFamily: "var(--font-dm-sans)", fontSize: "0.85rem", fontWeight: 700,
+                opacity: vacunas.length === 0 ? 0.5 : 1,
+              }}
+            >
+              <Download size={14} /> Descargar PDF
+            </button>
           </div>
 
           {loading ? (

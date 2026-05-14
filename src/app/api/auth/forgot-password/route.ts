@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
   try {
     const { data: usuario } = await createAdminClient()
       .from("usuarios")
-      .select("id_usuario, nombre, correo, activo")
+      .select("id_usuario, nombre, apellido, correo, activo")
       .eq("correo", correo)
       .maybeSingle();
 
@@ -54,8 +54,13 @@ export async function POST(req: NextRequest) {
 
     const resetUrl = `${getAppUrl(req)}/reset-password?token=${token}`;
 
+    const nombreCompleto = [usuario.nombre, usuario.apellido]
+      .filter(Boolean)
+      .join(" ")
+      .trim() || usuario.correo;
+
     await sendResetPassword({
-      nombreUsuario: usuario.nombre,
+      nombreUsuario: nombreCompleto,
       correoUsuario: usuario.correo,
       resetUrl,
     });

@@ -168,10 +168,16 @@ CREATE TABLE IF NOT EXISTS cartilla_vacunacion (
   lote                VARCHAR(100),
   id_veterinario      INT REFERENCES veterinarios(id_veterinario),
   observaciones       TEXT,
+  frecuencia          VARCHAR(20),     -- 'unica' | 'semanal' | '21dias' | 'mensual' | 'trimestral' | 'semestral' | 'anual'
   creado_en           TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+ALTER TABLE IF EXISTS cartilla_vacunacion ADD COLUMN IF NOT EXISTS frecuencia VARCHAR(20);
 CREATE INDEX IF NOT EXISTS idx_cartilla_mascota ON cartilla_vacunacion(id_mascota);
 CREATE INDEX IF NOT EXISTS idx_cartilla_proxima ON cartilla_vacunacion(fecha_proxima_dosis);
+
+-- Permitir que la historia clínica exista sin una cita asociada
+-- (p. ej. una entrada automática creada al registrar una vacuna).
+ALTER TABLE IF EXISTS historia_clinica ALTER COLUMN id_cita DROP NOT NULL;
 
 -- FK de recordatorios_enviados.id_vacuna → cartilla_vacunacion(id)
 DO $$ BEGIN

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { format12h } from "@/utils/datetime";
 
 interface TimeSlotsGridProps {
   fecha: string;           // "YYYY-MM-DD"
@@ -71,8 +72,9 @@ export function TimeSlotsGrid({ fecha, idVeterinario, selected, onSelect }: Time
               type="button"
               onClick={() => onSelect(slot)}
               style={{
-                width: "72px",
+                minWidth: "82px",
                 height: "38px",
+                padding: "0 10px",
                 borderRadius: "8px",
                 border: active ? "2px solid #3d845b" : "1.5px solid #b8e4c9",
                 background: active ? "#0a1a11" : "#f0fdf4",
@@ -84,7 +86,7 @@ export function TimeSlotsGrid({ fecha, idVeterinario, selected, onSelect }: Time
                 transition: "all 0.15s",
               }}
             >
-              {slot}
+              {format12h(slot)}
             </button>
           );
         })}

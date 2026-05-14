@@ -58,3 +58,16 @@ export function slotsDisponibles(fecha: string): string[] {
 export function esDentroDeHorario(fecha: string, hora: string): boolean {
   return slotsDisponibles(fecha).includes(hora);
 }
+
+/**
+ * "HH:mm" (24 h) → "h:mm AM/PM". Si recibe "HH:mm:ss" toma solo HH:mm.
+ */
+export function format12h(hhmm: string | null | undefined): string {
+  if (!hhmm) return "";
+  const [hStr, mStr] = hhmm.slice(0, 5).split(":");
+  const h = Number(hStr);
+  if (!Number.isFinite(h)) return hhmm;
+  const period = h >= 12 ? "PM" : "AM";
+  const hour12 = ((h + 11) % 12) + 1;
+  return `${hour12}:${mStr ?? "00"} ${period}`;
+}

@@ -102,6 +102,7 @@ export interface CartillaVacunacion {
   lote: string | null;
   id_veterinario: number | null;
   observaciones: string | null;
+  frecuencia: "unica" | "semanal" | "21dias" | "mensual" | "trimestral" | "semestral" | "anual" | null;
   creado_en: string;
   veterinario?: Pick<Veterinario, "id_veterinario"> & { usuario: Pick<Usuario, "nombre" | "apellido"> };
 }
@@ -115,7 +116,7 @@ export interface EsquemaVacuna {
 
 export interface HistoriaClinica {
   id_historia: number;
-  id_cita: number;
+  id_cita: number | null;   // las entradas de vacunación pueden no tener cita asociada
   id_mascota: number;
   id_veterinario: number;
   fecha_consulta: string; // "YYYY-MM-DD"

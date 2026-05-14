@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { FilePlus, Eye, Pencil } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { FilePlus, Eye, Pencil, Download } from "lucide-react";
 import { Table, type Column } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
@@ -9,16 +9,24 @@ import { HistoriaClinicaForm } from "@/components/forms/HistoriaClinicaForm";
 import { formatLima } from "@/utils/datetime";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/context/toast";
+import { exportHistorialPdf } from "@/utils/historialPdf";
 
 interface HistoriaRow {
   id_historia: number;
+  id_mascota: number;
   fecha_consulta: string;
   diagnostico: string;
   tratamiento: string;
   observaciones: string | null;
   peso_consulta: number | null;
-  mascotas: { nombre: string };
+  mascotas: { nombre: string; especie?: string; raza?: string | null; sexo?: string | null; color?: string | null; fecha_nacimiento?: string | null; clientes?: { usuarios: { nombre: string; apellido: string } } };
   veterinarios: { usuarios: { nombre: string; apellido: string } };
+}
+
+interface MascotaOption {
+  id_mascota: number;
+  nombre: string;
+  especie: string;
 }
 
 function DetailRow({ label, value }: { label: string; value: string }) {
@@ -138,23 +146,68 @@ function EditHistoriaForm({
 
 export default function HistoriaClinicaPage() {
   const [historias, setHistorias] = useState<HistoriaRow[]>([]);
+  const [mascotasDisponibles, setMascotasDisponibles] = useState<MascotaOption[]>([]);
+  const [mascotaFilter, setMascotaFilter] = useState<number | "all">("all");
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
   const [detailItem, setDetailItem] = useState<HistoriaRow | null>(null);
   const [editItem, setEditItem] = useState<HistoriaRow | null>(null);
   const { user } = useAuth();
   const isAdmin = user?.rol === "administrador";
+  const puedeCrear = user?.rol === "administrador" || user?.rol === "veterinario";
   const toast = useToast();
 
   const fetchHistorias = async () => {
     setLoading(true);
-    const res = await fetch("/api/historia-clinica");
-    const json = await res.json();
-    setHistorias(json.data ?? []);
+    const [hRes, mRes] = await Promise.all([
+      fetch("/api/historia-clinica").then((r) => r.json()).catch(() => ({})),
+      fetch("/api/mascotas").then((r) => r.json()).catch(() => ({})),
+    ]);
+    setHistorias(hRes.data ?? []);
+    setMascotasDisponibles(
+      (mRes.data ?? []).map((m: MascotaOption) => ({
+        id_mascota: m.id_mascota,
+        nombre: m.nombre,
+        especie: m.especie,
+      })),
+    );
     setLoading(false);
   };
 
   useEffect(() => { fetchHistorias(); }, []);
+
+  const historiasFiltradas = useMemo(() => (
+    mascotaFilter === "all"
+      ? historias
+      : historias.filter((h) => h.id_mascota === mascotaFilter)
+  ), [historias, mascotaFilter]);
+
+  const handleDescargarPdf = async () => {
+    const mascotasParaPdf = mascotaFilter === "all"
+      ? mascotasDisponibles.filter((m) => historias.some((h) => h.id_mascota === m.id_mascota))
+      : mascotasDisponibles.filter((m) => m.id_mascota === mascotaFilter);
+    if (mascotasParaPdf.length === 0) {
+      toast.error("No hay historias clínicas para exportar");
+      return;
+    }
+    for (const m of mascotasParaPdf) {
+      const historiasMascota = historias.filter((h) => h.id_mascota === m.id_mascota);
+      const ref = historiasMascota[0]?.mascotas;
+      await exportHistorialPdf({
+        mascota: {
+          id_mascota: m.id_mascota,
+          nombre: m.nombre,
+          especie: m.especie,
+          raza: ref?.raza ?? null,
+          sexo: ref?.sexo ?? null,
+          color: ref?.color ?? null,
+          fecha_nacimiento: ref?.fecha_nacimiento ?? null,
+          clientes: ref?.clientes,
+        },
+        historias: historiasMascota,
+      });
+    }
+  };
 
   const handleCreate = async (data: Record<string, unknown>) => {
     const res = await fetch("/api/historia-clinica", {
@@ -250,14 +303,39 @@ export default function HistoriaClinicaPage() {
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Historia Clínica</h1>
           <p className="text-sm text-gray-500">Registros de consultas y tratamientos</p>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <FilePlus className="size-4" />
-          <span className="hidden sm:inline">Nueva historia</span>
-          <span className="sm:hidden">Nueva</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" onClick={handleDescargarPdf} disabled={historiasFiltradas.length === 0}>
+            <Download className="size-4" />
+            <span className="hidden sm:inline">Descargar PDF</span>
+            <span className="sm:hidden">PDF</span>
+          </Button>
+          {puedeCrear && (
+            <Button onClick={() => setCreateOpen(true)}>
+              <FilePlus className="size-4" />
+              <span className="hidden sm:inline">Nueva historia</span>
+              <span className="sm:hidden">Nueva</span>
+            </Button>
+          )}
+        </div>
       </div>
 
-      <Table columns={columns} data={historias} keyField="id_historia" loading={loading} emptyMessage="No hay historias clínicas registradas" />
+      {mascotasDisponibles.length > 1 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Mascota</span>
+          <select
+            value={String(mascotaFilter)}
+            onChange={(e) => setMascotaFilter(e.target.value === "all" ? "all" : Number(e.target.value))}
+            className="h-9 rounded-lg border border-gray-200 px-3 text-sm focus:border-petcare-500 focus:outline-none focus:ring-2 focus:ring-petcare-100"
+          >
+            <option value="all">Todas las mascotas</option>
+            {mascotasDisponibles.map((m) => (
+              <option key={m.id_mascota} value={m.id_mascota}>{m.nombre} ({m.especie})</option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      <Table columns={columns} data={historiasFiltradas} keyField="id_historia" loading={loading} emptyMessage="No hay historias clínicas registradas" />
 
       <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Nueva historia clínica" className="max-w-2xl">
         <HistoriaClinicaForm onSubmit={handleCreate} />

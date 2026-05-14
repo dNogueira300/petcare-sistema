@@ -4,13 +4,26 @@ import { createAdminClient } from "@/utils/supabase/server";
 import { getSessionUser, hashPassword } from "@/lib/auth";
 import { passwordSchema } from "@/utils/password";
 
+const horaRe = /^\d{2}:\d{2}(:\d{2})?$/;
+
+const horarioSchema = z.object({
+  dia_semana: z.number().int().min(1).max(7),
+  hora_inicio: z.string().regex(horaRe),
+  hora_fin: z.string().regex(horaRe),
+});
+
 const updateSchema = z.object({
   nombre: z.string().min(2).optional(),
   apellido: z.string().min(2).optional(),
   correo: z.string().email().optional(),
   rol: z.enum(["administrador", "veterinario", "recepcionista"]).optional(),
   especialidad: z.string().optional(),
+  horarios: z.array(horarioSchema).optional(),
 });
+
+function normalizaHora(h: string): string {
+  return h.length === 5 ? `${h}:00` : h;
+}
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -46,7 +59,18 @@ export async function PUT(req: NextRequest, { params }: Params) {
   }
 
   const supabase = createAdminClient();
-  const { especialidad, ...userFields } = parsed.data;
+  const { especialidad, horarios, ...userFields } = parsed.data;
+
+  if (horarios) {
+    for (const h of horarios) {
+      if (h.hora_fin <= h.hora_inicio) {
+        return NextResponse.json(
+          { error: `Franja inválida (día ${h.dia_semana}): la hora fin debe ser mayor que la hora inicio` },
+          { status: 400 },
+        );
+      }
+    }
+  }
 
   let data;
   if (Object.keys(userFields).length > 0) {
@@ -68,21 +92,49 @@ export async function PUT(req: NextRequest, { params }: Params) {
     data = res.data;
   }
 
-  if (data.rol === "veterinario" && especialidad !== undefined) {
+  let idVeterinario: number | null = null;
+  if (data.rol === "veterinario") {
     const { data: vetRow } = await supabase
       .from("veterinarios")
       .select("id_veterinario")
       .eq("id_usuario", id)
       .maybeSingle();
     if (vetRow) {
-      await supabase.from("veterinarios").update({ especialidad: especialidad || null }).eq("id_usuario", id);
+      idVeterinario = vetRow.id_veterinario;
+      if (especialidad !== undefined) {
+        await supabase.from("veterinarios").update({ especialidad: especialidad || null }).eq("id_usuario", id);
+      }
     } else {
-      await supabase.from("veterinarios").insert({
-        id_usuario: Number(id),
-        especialidad: especialidad || null,
-        horario_inicio: "07:00",
-        horario_fin: "20:00",
-      });
+      const { data: nuevoVet } = await supabase
+        .from("veterinarios")
+        .insert({
+          id_usuario: Number(id),
+          especialidad: especialidad !== undefined ? (especialidad || null) : null,
+          horario_inicio: "07:00",
+          horario_fin: "20:00",
+        })
+        .select("id_veterinario")
+        .single();
+      idVeterinario = nuevoVet?.id_veterinario ?? null;
+    }
+
+    if (horarios && idVeterinario !== null) {
+      const { error: delError } = await supabase
+        .from("horarios_veterinario")
+        .delete()
+        .eq("id_veterinario", idVeterinario);
+      if (delError) return NextResponse.json({ error: delError.message }, { status: 500 });
+
+      if (horarios.length > 0) {
+        const rows = horarios.map((h) => ({
+          id_veterinario: idVeterinario,
+          dia_semana: h.dia_semana,
+          hora_inicio: normalizaHora(h.hora_inicio),
+          hora_fin: normalizaHora(h.hora_fin),
+        }));
+        const { error: insError } = await supabase.from("horarios_veterinario").insert(rows);
+        if (insError) return NextResponse.json({ error: insError.message }, { status: 500 });
+      }
     }
   }
 

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ArrowLeft, Plus, Trash2, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageLoading } from "@/components/ui/loading";
+import { TimePicker12h } from "@/components/ui/time-picker-12h";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/context/toast";
 import { DIA_SEMANA_LABEL } from "@/types";
@@ -120,31 +121,30 @@ export default function HorariosVeterinarioPage() {
               </div>
               <div className="flex flex-col gap-2">
                 {franjas.map((f, idx) => (
-                  <div key={idx} className="flex items-center gap-1.5">
-                    <input
-                      type="time"
+                  <div key={idx} className="flex flex-col gap-1.5 rounded-lg border border-gray-200 bg-white/60 p-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Inicio</span>
+                      {isAdmin && (
+                        <button
+                          onClick={() => removeFranja(d, idx)}
+                          title="Eliminar franja"
+                          className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      )}
+                    </div>
+                    <TimePicker12h
                       value={f.hora_inicio}
                       disabled={!isAdmin}
-                      onChange={(e) => updateFranja(d, idx, "hora_inicio", e.target.value)}
-                      className="h-9 flex-1 rounded-lg border border-gray-300 px-2 text-sm focus:border-petcare-500 focus:outline-none"
+                      onChange={(v) => updateFranja(d, idx, "hora_inicio", v)}
                     />
-                    <span className="text-gray-400">–</span>
-                    <input
-                      type="time"
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Fin</span>
+                    <TimePicker12h
                       value={f.hora_fin}
                       disabled={!isAdmin}
-                      onChange={(e) => updateFranja(d, idx, "hora_fin", e.target.value)}
-                      className="h-9 flex-1 rounded-lg border border-gray-300 px-2 text-sm focus:border-petcare-500 focus:outline-none"
+                      onChange={(v) => updateFranja(d, idx, "hora_fin", v)}
                     />
-                    {isAdmin && (
-                      <button
-                        onClick={() => removeFranja(d, idx)}
-                        title="Eliminar franja"
-                        className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors"
-                      >
-                        <Trash2 className="size-4" />
-                      </button>
-                    )}
                   </div>
                 ))}
                 {isAdmin && (

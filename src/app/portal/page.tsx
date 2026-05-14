@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { PawPrint, CalendarDays, FileText, LogOut, User, ChevronRight, X, CalendarPlus, CheckCircle, Plus, CalendarClock, Syringe } from "lucide-react";
@@ -8,25 +8,26 @@ import { useAuth } from "@/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
 import { AvailabilityCalendar } from "@/components/ui/availability-calendar";
 import { TimeSlotsGrid } from "@/components/ui/time-slots-grid";
-import { formatLima } from "@/utils/datetime";
+import { formatLima, format12h } from "@/utils/datetime";
+import { exportHistorialPdf } from "@/utils/historialPdf";
 import type { EstadoCita } from "@/types";
 
 /* ═══ types ═══ */
 interface MascotaRow { id_mascota: number; nombre: string; especie: string; raza: string | null; sexo: string | null; color: string | null; fecha_nacimiento: string | null; peso: number | null; }
 const SEXO_LABEL: Record<string, string> = { macho: "Macho", hembra: "Hembra" };
 interface CitaRow { id_cita: number; id_veterinario: number; fecha: string; hora: string; motivo: string; estado: EstadoCita; mascotas: { nombre: string; especie: string }; veterinarios: { usuarios: { nombre: string; apellido: string } }; }
-interface HistoriaRow { id_historia: number; fecha_consulta: string; diagnostico: string; tratamiento: string; observaciones: string | null; peso_consulta: number | null; mascotas: { nombre: string }; veterinarios: { usuarios: { nombre: string; apellido: string } }; }
+interface HistoriaRow { id_historia: number; id_mascota: number; fecha_consulta: string; diagnostico: string; tratamiento: string; observaciones: string | null; peso_consulta: number | null; mascotas: { nombre: string }; veterinarios: { usuarios: { nombre: string; apellido: string } }; }
 interface VetOption { id_veterinario: number; usuarios: { nombre: string; apellido: string } }
 
 const estadoLabels: Record<EstadoCita, string> = { pendiente:"Pendiente", confirmada:"Confirmada", cancelada:"Cancelada", atendida:"Atendida" };
 
 function calcEdad(fn: string | null) {
   if (!fn) return "—";
-  const [by,bm,bd] = fn.split("-").map(Number);
+  const [by, bm] = fn.split("-").map(Number);
   const now = new Date();
-  let y = now.getFullYear() - by, m = now.getMonth()+1 - bm;
+  let y = now.getFullYear() - by, m = now.getMonth() + 1 - bm;
   if (m < 0) { y--; m += 12; }
-  return y > 0 ? `${y} año${y!==1?"s":""}` : `${m} mes${m!==1?"es":""}`;
+  return y > 0 ? `${y} año${y !== 1 ? "s" : ""}` : `${m} mes${m !== 1 ? "es" : ""}`;
 }
 
 function dateToStr(d: Date): string {
@@ -69,8 +70,8 @@ function MascotaCard({ m }: { m: MascotaRow }) {
       <Link href={`/portal/mascotas/${m.id_mascota}/cartilla`}
         style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:"6px",
           background:"#f0fdf4", border:"1px solid #bbf7d0", color:"#16a34a", textDecoration:"none",
-          padding:"8px", borderRadius:"9px", fontFamily:"var(--font-dm-sans)", fontSize:"0.8rem", fontWeight:600 }}>
-        <Syringe size={13} /> Ver cartilla de vacunas
+          padding:"8px", borderRadius:"9px", fontFamily:"var(--font-dm-sans)", fontSize:"0.78rem", fontWeight:600 }}>
+        <Syringe size={12} /> Cartilla de vacunas
       </Link>
     </div>
   );
@@ -288,7 +289,7 @@ function RescheduleCitaModal({ cita, open, onClose, onRescheduled }: {
               </div>
               <p style={{ fontFamily:"var(--font-fraunces)", fontSize:"1.2rem", fontWeight:700, fontStyle:"italic", color:"#1a1208", margin:"0 0 8px" }}>¡Listo!</p>
               <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.88rem", color:"#8a7a60", lineHeight:1.6, margin:"0 0 20px" }}>
-                Tu cita fue reprogramada para el <strong>{fecha}</strong> a las <strong>{hora}</strong>.
+                Tu cita fue reprogramada para el <strong>{fecha}</strong> a las <strong>{format12h(hora)}</strong>.
               </p>
               <button onClick={onClose} style={{ background:"#0a1a11", color:"#fff", border:"none", cursor:"pointer", padding:"12px 28px", borderRadius:"10px", fontFamily:"var(--font-dm-sans)", fontSize:"0.88rem", fontWeight:600 }}>
                 Cerrar
@@ -364,10 +365,12 @@ function BookingModal({ open, onClose, mascotas, onBooked }: {
     }
   }
 
-  // Auto-assign first vet
-  useEffect(() => {
+  // Auto-asignar primer veterinario en cuanto se cargan, sin useEffect.
+  const [prevVetsCount, setPrevVetsCount] = useState(vets.length);
+  if (prevVetsCount !== vets.length) {
+    setPrevVetsCount(vets.length);
     if (vets.length > 0 && !idVet) setIdVet(vets[0].id_veterinario.toString());
-  }, [vets, idVet]);
+  }
 
   const handleDaySelect = (date: Date | undefined) => {
     setSelectedDay(date);
@@ -553,12 +556,15 @@ export default function PortalPage() {
   const [mascotaModalOpen, setMascotaModalOpen] = useState(false);
   const [rescheduleItem, setRescheduleItem] = useState<CitaRow | null>(null);
   const [noMascotasAlert, setNoMascotasAlert] = useState(false);
-  const [verifiedBanner, setVerifiedBanner] = useState(false);
+  // Lectura síncrona del query param: evita setState dentro de un efecto.
+  const [verifiedBanner, setVerifiedBanner] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return new URLSearchParams(window.location.search).get("verified") === "1";
+  });
+
+  const [historialMascotaId, setHistorialMascotaId] = useState<number | "all">("all");
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("verified") === "1") setVerifiedBanner(true);
-
     const stored = sessionStorage.getItem("petcare_user");
     if (stored) {
       const u = JSON.parse(stored) as { rol: string };
@@ -571,6 +577,7 @@ export default function PortalPage() {
       .then((j) => {
         if (j?.user?.rol === "cliente") {
           sessionStorage.setItem("petcare_user", JSON.stringify(j.user));
+          sessionStorage.setItem("petcare_session_exp", String(Date.now() + 8 * 60 * 60 * 1000));
           window.location.reload();
         } else if (j?.user) {
           window.location.href = "/dashboard";
@@ -581,7 +588,7 @@ export default function PortalPage() {
       .catch(() => { window.location.href = "/"; });
   }, []);
 
-  const loadTab = async (t: Tab) => {
+  const loadTab = useCallback(async (t: Tab) => {
     setLoadingTab(true);
     try {
       if (t === "mascotas") {
@@ -589,12 +596,18 @@ export default function PortalPage() {
       } else if (t === "citas") {
         const r = await fetch("/api/citas"); const j = await r.json(); setCitas(j.data ?? []);
       } else {
-        const r = await fetch("/api/historia-clinica"); const j = await r.json(); setHistorias(j.data ?? []);
+        // El selector y el PDF necesitan también la lista de mascotas del cliente.
+        const [hRes, mRes] = await Promise.all([
+          fetch("/api/historia-clinica").then((r) => r.json()).catch(() => ({})),
+          fetch("/api/mascotas").then((r) => r.json()).catch(() => ({})),
+        ]);
+        setHistorias(hRes.data ?? []);
+        setMascotas(mRes.data ?? []);
       }
     } finally { setLoadingTab(false); }
-  };
+  }, []);
 
-  useEffect(() => { loadTab(tab); }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { loadTab(tab); }, [tab, loadTab]);
 
   const firstName = user?.nombre ?? "Cliente";
 
@@ -809,7 +822,7 @@ export default function PortalPage() {
                           {c.mascotas?.nombre ?? "—"} · {c.motivo}
                         </p>
                         <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.78rem", color:"#8a7a60", margin:0 }}>
-                          {formatLima(`${c.fecha}T00:00:00`, "dd/MM/yyyy")} a las {c.hora.slice(0,5)}
+                          {formatLima(`${c.fecha}T00:00:00`, "dd/MM/yyyy")} a las {format12h(c.hora)}
                           {c.veterinarios ? ` · Dr. ${c.veterinarios.usuarios.nombre} ${c.veterinarios.usuarios.apellido}` : ""}
                         </p>
                       </div>
@@ -837,15 +850,88 @@ export default function PortalPage() {
               </div>
             )}
 
-            {tab === "historial" && (
-              <div style={{ display:"flex", flexDirection:"column", gap:"10px" }}>
-                {historias.length === 0 ? (
+            {tab === "historial" && (() => {
+              const historiasFiltradas = historialMascotaId === "all"
+                ? historias
+                : historias.filter((h) => h.id_mascota === historialMascotaId);
+              const mascotaSeleccionada = historialMascotaId === "all"
+                ? null
+                : mascotas.find((m) => m.id_mascota === historialMascotaId) ?? null;
+              const handleDescargar = async () => {
+                const mascotasParaPdf = mascotaSeleccionada
+                  ? [mascotaSeleccionada]
+                  : mascotas.filter((m) => historias.some((h) => h.id_mascota === m.id_mascota));
+                for (const mPdf of mascotasParaPdf) {
+                  await exportHistorialPdf({
+                    mascota: {
+                      id_mascota: mPdf.id_mascota,
+                      nombre: mPdf.nombre,
+                      especie: mPdf.especie,
+                      raza: mPdf.raza,
+                      sexo: mPdf.sexo,
+                      color: mPdf.color,
+                      fecha_nacimiento: mPdf.fecha_nacimiento,
+                      clientes: user ? { usuarios: { nombre: user.nombre, apellido: user.apellido } } : undefined,
+                    },
+                    historias: historias.filter((h) => h.id_mascota === mPdf.id_mascota),
+                  });
+                }
+              };
+              return (
+              <div style={{ display:"flex", flexDirection:"column", gap:"14px" }}>
+                {mascotas.length > 1 && (
+                  <div style={{ display:"flex", flexWrap:"wrap", gap:"12px", alignItems:"center", justifyContent:"space-between" }}>
+                    <label style={{ display:"flex", alignItems:"center", gap:"10px", flex:"1 1 220px" }}>
+                      <span style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.78rem", fontWeight:700,
+                        textTransform:"uppercase", letterSpacing:"0.07em", color:"#6b5c44", whiteSpace:"nowrap" }}>
+                        Mascota
+                      </span>
+                      <select
+                        value={String(historialMascotaId)}
+                        onChange={(e) => setHistorialMascotaId(e.target.value === "all" ? "all" : Number(e.target.value))}
+                        style={{ flex:1, height:"38px", borderRadius:"9px", border:"1.5px solid #d0c8b8",
+                          background:"#fdfaf5", padding:"0 12px", fontSize:"0.85rem",
+                          fontFamily:"var(--font-dm-sans)", color:"#1a1208", outline:"none" }}>
+                        <option value="all">Todas mis mascotas</option>
+                        {mascotas.map((m) => (
+                          <option key={m.id_mascota} value={m.id_mascota}>{m.nombre} ({m.especie})</option>
+                        ))}
+                      </select>
+                    </label>
+                    <button
+                      onClick={handleDescargar}
+                      disabled={historiasFiltradas.length === 0}
+                      style={{ display:"flex", alignItems:"center", gap:"6px",
+                        background:"#2d6a4f", color:"#fff", border:"none",
+                        cursor: historiasFiltradas.length === 0 ? "not-allowed" : "pointer",
+                        padding:"10px 16px", borderRadius:"9px",
+                        fontFamily:"var(--font-dm-sans)", fontSize:"0.85rem", fontWeight:700,
+                        opacity: historiasFiltradas.length === 0 ? 0.5 : 1 }}>
+                      <FileText size={14} /> Descargar PDF
+                    </button>
+                  </div>
+                )}
+                {mascotas.length === 1 && historias.length > 0 && (
+                  <div style={{ display:"flex", justifyContent:"flex-end" }}>
+                    <button
+                      onClick={handleDescargar}
+                      style={{ display:"flex", alignItems:"center", gap:"6px",
+                        background:"#2d6a4f", color:"#fff", border:"none", cursor:"pointer",
+                        padding:"10px 16px", borderRadius:"9px",
+                        fontFamily:"var(--font-dm-sans)", fontSize:"0.85rem", fontWeight:700 }}>
+                      <FileText size={14} /> Descargar PDF
+                    </button>
+                  </div>
+                )}
+                {historiasFiltradas.length === 0 ? (
                   <div style={{ textAlign:"center", padding:"60px 20px", color:"#8a7a60",
                     fontFamily:"var(--font-dm-sans)", fontSize:"0.9rem" }}>
                     <FileText size={40} color="#d9cfba" style={{ margin:"0 auto 12px", display:"block" }} />
-                    No hay historias clínicas registradas.
+                    {historias.length === 0
+                      ? "No hay historias clínicas registradas."
+                      : "No hay historias para la mascota seleccionada."}
                   </div>
-                ) : historias.map(h => (
+                ) : historiasFiltradas.map(h => (
                   <div key={h.id_historia} style={{ background:"#fff", border:"1px solid #e8e0d0",
                     borderRadius:"14px", padding:"20px 24px" }}>
                     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start",
@@ -884,7 +970,8 @@ export default function PortalPage() {
                   </div>
                 ))}
               </div>
-            )}
+              );
+            })()}
           </>
         )}
         </div>{/* cierre tab content */}
@@ -935,7 +1022,7 @@ export default function PortalPage() {
               {[
                 ["Mascota", `${detailCita.mascotas?.nombre} (${detailCita.mascotas?.especie})`],
                 ["Fecha", formatLima(`${detailCita.fecha}T00:00:00`, "dd/MM/yyyy")],
-                ["Hora", detailCita.hora.slice(0,5)],
+                ["Hora", format12h(detailCita.hora)],
                 ["Veterinario", detailCita.veterinarios ? `${detailCita.veterinarios.usuarios.nombre} ${detailCita.veterinarios.usuarios.apellido}` : "—"],
                 ["Motivo", detailCita.motivo],
                 ["Estado", estadoLabels[detailCita.estado]],

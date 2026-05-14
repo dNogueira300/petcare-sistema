@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
   const session = await getSessionUser();
   if (!session) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
 
-  const allowed = ["administrador", "veterinario", "cliente"];
+  const allowed = ["administrador", "veterinario", "recepcionista", "cliente"];
   if (!allowed.includes(session.rol)) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }

@@ -9,7 +9,8 @@ function genFranja(inicio: string, fin: string): string[] {
   const [eh, em] = fin.slice(0, 5).split(":").map(Number);
   const out: string[] = [];
   let h = sh, m = sm;
-  while (h < eh || (h === eh && m <= em)) {
+  // El slot dura 30 min — sólo emite la hora de inicio si la cita cabe completa dentro de la franja.
+  while (h < eh || (h === eh && m < em)) {
     out.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
     m += 30;
     if (m >= 60) { h++; m -= 60; }

@@ -54,7 +54,10 @@ function htmlResponse({ ok, dest, user }: PageOpts): NextResponse {
 (function(){
   try {
     var u = ${userLiteral};
-    if (u) sessionStorage.setItem('petcare_user', u);
+    if (u) {
+      sessionStorage.setItem('petcare_user', u);
+      sessionStorage.setItem('petcare_session_exp', String(Date.now() + 8*60*60*1000));
+    }
   } catch (e) {}
   setTimeout(function(){ window.location.replace(${destLiteral}); }, 1400);
 })();

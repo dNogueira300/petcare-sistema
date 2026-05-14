@@ -1,15 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CalendarPlus, Pencil, FilePlus, Eye } from "lucide-react";
+import { CalendarPlus, Pencil, Eye } from "lucide-react";
 import { Table, type Column } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select } from "@/components/ui/select";
 import { Modal } from "@/components/ui/modal";
+import { TimeSlotsGrid } from "@/components/ui/time-slots-grid";
 import { CitaForm } from "@/components/forms/CitaForm";
 import { HistoriaClinicaForm, type PrefillCita } from "@/components/forms/HistoriaClinicaForm";
-import { formatLima, hoyCimaFecha, slotsDisponibles } from "@/utils/datetime";
+import { formatLima, hoyCimaFecha, format12h } from "@/utils/datetime";
 import type { EstadoCita, OrigenCita } from "@/types";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/context/toast";
@@ -52,14 +53,13 @@ function EditCitaForm({
   const [fecha, setFecha] = useState(cita.fecha);
   const [hora, setHora] = useState(cita.hora.slice(0, 5));
   const [submitting, setSubmitting] = useState(false);
-
-  const slots = fecha ? slotsDisponibles(fecha) : [];
-  const esDomingo = slots.length === 0 && !!fecha;
-
-  // Reset hora when fecha changes and current hora is not in new slots
-  useEffect(() => {
-    if (slots.length > 0 && !slots.includes(hora)) setHora("");
-  }, [fecha]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Si cambia la fecha (vs la original de la cita), reseteamos la hora durante el render
+  // — patrón "previous prop", evita un useEffect que dispare cascading renders.
+  const [prevFecha, setPrevFecha] = useState(fecha);
+  if (prevFecha !== fecha) {
+    setPrevFecha(fecha);
+    if (fecha !== cita.fecha && hora !== "") setHora("");
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,8 +69,6 @@ function EditCitaForm({
     setSubmitting(false);
   };
 
-  const horaOptions = slots.map((h) => ({ value: h, label: h }));
-
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div>
@@ -79,39 +77,28 @@ function EditCitaForm({
           {cita.veterinarios.usuarios.nombre} {cita.veterinarios.usuarios.apellido}
         </p>
       </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Fecha</label>
-          <input
-            type="date"
-            value={fecha}
-            min={hoyCimaFecha()}
-            onChange={(e) => setFecha(e.target.value)}
-            required
-            className="h-10 rounded-[9px] border border-gray-200 px-3 text-sm focus:border-petcare-500 focus:outline-none focus:ring-2 focus:ring-petcare-100"
-          />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Hora</label>
-          <select
-            value={hora}
-            onChange={(e) => setHora(e.target.value)}
-            required
-            disabled={!fecha || esDomingo}
-            className="h-10 rounded-[9px] border border-gray-200 px-3 text-sm focus:border-petcare-500 focus:outline-none focus:ring-2 focus:ring-petcare-100 disabled:opacity-50"
-          >
-            <option value="">
-              {!fecha ? "Selecciona fecha primero" : esDomingo ? "Sin atención los domingos" : "Seleccionar hora…"}
-            </option>
-            {horaOptions.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
-        </div>
+      <div className="flex flex-col gap-1.5">
+        <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Fecha</label>
+        <input
+          type="date"
+          value={fecha}
+          min={hoyCimaFecha()}
+          onChange={(e) => setFecha(e.target.value)}
+          required
+          className="h-10 rounded-[9px] border border-gray-200 px-3 text-sm focus:border-petcare-500 focus:outline-none focus:ring-2 focus:ring-petcare-100"
+        />
       </div>
-      {esDomingo && (
-        <p className="text-sm text-amber-600">Los domingos no hay atención. Selecciona otro día.</p>
+
+      {/* Horarios reales del veterinario para la fecha elegida */}
+      {fecha && (
+        <TimeSlotsGrid
+          fecha={fecha}
+          idVeterinario={cita.id_veterinario}
+          selected={hora}
+          onSelect={setHora}
+        />
       )}
+
       <div style={{ position:"sticky", bottom:0, background:"#fff",
         borderTop:"1px solid #f0ead8", padding:"12px 0 16px", marginTop:"4px" }}>
         <Button type="submit" loading={submitting} disabled={!hora} className="w-full">
@@ -227,7 +214,7 @@ export default function CitasPage() {
       header: "Fecha",
       render: (c) => formatLima(`${c.fecha}T00:00:00`, "dd/MM/yyyy"),
     },
-    { key: "hora", header: "Hora", className: "hidden sm:table-cell", render: (c) => c.hora.slice(0, 5) },
+    { key: "hora", header: "Hora", className: "hidden sm:table-cell", render: (c) => format12h(c.hora) },
     {
       key: "mascota",
       header: "Mascota",
@@ -287,10 +274,9 @@ export default function CitasPage() {
           {(isVet || canEdit) && c.estado === "confirmada" && (
             <button
               onClick={() => openHistoria(c)}
-              title="Llenar historia clínica"
-              className="rounded-lg p-1.5 text-gray-400 hover:bg-green-50 hover:text-green-700 transition-colors"
+              className="rounded px-2 py-1 text-xs font-medium text-green-700 hover:bg-green-50 transition-colors whitespace-nowrap"
             >
-              <FilePlus className="size-4" />
+              Llenar historial clínica
             </button>
           )}
           {c.estado === "pendiente" && (
@@ -377,7 +363,7 @@ export default function CitasPage() {
             {[
               ["Mascota", `${detailItem.mascotas?.nombre ?? "—"} (${detailItem.mascotas?.especie ?? ""})`],
               ["Fecha", formatLima(`${detailItem.fecha}T00:00:00`, "dd/MM/yyyy")],
-              ["Hora", detailItem.hora.slice(0, 5)],
+              ["Hora", format12h(detailItem.hora)],
               ["Veterinario", detailItem.veterinarios ? `${detailItem.veterinarios.usuarios.nombre} ${detailItem.veterinarios.usuarios.apellido}` : "—"],
               ["Motivo", detailItem.motivo],
             ].map(([label, value]) => (
