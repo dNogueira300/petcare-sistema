@@ -37,7 +37,7 @@ export function Modal({
       />
       <div
         className={cn(
-          "relative z-10 w-full max-w-lg rounded-2xl bg-white shadow-xl",
+          "relative z-10 w-full max-w-2xl rounded-2xl bg-white shadow-xl",
           "flex flex-col max-h-[90vh]",
           className,
         )}
@@ -55,9 +55,7 @@ export function Modal({
           </div>
         )}
         {/* Contenido scrolleable — sin padding-bottom: lo provee el footer sticky */}
-        <div className="px-6 pt-4 pb-0 overflow-y-auto flex-1 overflow-x-visible">
-          {children}
-        </div>
+        <div className="px-6 pt-4 pb-0 overflow-y-auto flex-1">{children}</div>
       </div>
     </div>
   );

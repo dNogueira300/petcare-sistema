@@ -31,7 +31,10 @@ const editSchema = z.object(baseFields);
 type CreateData = z.infer<typeof createSchema>;
 type EditData = z.infer<typeof editSchema>;
 
-export interface Franja { hora_inicio: string; hora_fin: string }
+export interface Franja {
+  hora_inicio: string;
+  hora_fin: string;
+}
 export type HorariosEstado = Record<number, Franja[]>;
 export interface UsuarioFormSubmitData {
   nombre: string;
@@ -87,26 +90,39 @@ export function UsuarioForm({
     name: "contrasena" as never,
     defaultValue: "",
   }) as string;
-  const rolValue = useWatch({ control, name: "rol" as never }) as string | undefined;
+  const rolValue = useWatch({ control, name: "rol" as never }) as
+    | string
+    | undefined;
   const e = errors as Record<string, { message?: string }>;
 
-  const [horarios, setHorarios] = useState<HorariosEstado>(defaultHorarios ?? emptyHorarios());
+  const [horarios, setHorarios] = useState<HorariosEstado>(
+    defaultHorarios ?? emptyHorarios(),
+  );
   const [horariosError, setHorariosError] = useState<string | null>(null);
   // Patrón "previous prop": si cambia defaultHorarios (p.ej. al abrir el modal para otro vet),
   // re-sincronizamos el estado en render — sin useEffect, evitando cascading renders.
-  const [prevDefaultHorarios, setPrevDefaultHorarios] = useState(defaultHorarios);
+  const [prevDefaultHorarios, setPrevDefaultHorarios] =
+    useState(defaultHorarios);
   if (prevDefaultHorarios !== defaultHorarios) {
     setPrevDefaultHorarios(defaultHorarios);
     setHorarios(defaultHorarios ?? emptyHorarios());
   }
 
   const addFranja = (dia: number) =>
-    setHorarios((s) => ({ ...s, [dia]: [...s[dia], { hora_inicio: "08:00", hora_fin: "13:00" }] }));
+    setHorarios((s) => ({
+      ...s,
+      [dia]: [...s[dia], { hora_inicio: "08:00", hora_fin: "13:00" }],
+    }));
 
   const removeFranja = (dia: number, idx: number) =>
     setHorarios((s) => ({ ...s, [dia]: s[dia].filter((_, i) => i !== idx) }));
 
-  const updateFranja = (dia: number, idx: number, campo: keyof Franja, valor: string) =>
+  const updateFranja = (
+    dia: number,
+    idx: number,
+    campo: keyof Franja,
+    valor: string,
+  ) =>
     setHorarios((s) => ({
       ...s,
       [dia]: s[dia].map((f, i) => (i === idx ? { ...f, [campo]: valor } : f)),
@@ -129,13 +145,19 @@ export function UsuarioForm({
       for (const d of DIAS) {
         for (const f of horarios[d]) {
           if (!f.hora_inicio || !f.hora_fin || f.hora_fin <= f.hora_inicio) {
-            setHorariosError(`Revisa las franjas del ${DIA_SEMANA_LABEL[d]}: la hora fin debe ser mayor que la de inicio.`);
+            setHorariosError(
+              `Revisa las franjas del ${DIA_SEMANA_LABEL[d]}: la hora fin debe ser mayor que la de inicio.`,
+            );
             return;
           }
         }
       }
       out.horarios = DIAS.flatMap((d) =>
-        horarios[d].map((f) => ({ dia_semana: d, hora_inicio: f.hora_inicio, hora_fin: f.hora_fin })),
+        horarios[d].map((f) => ({
+          dia_semana: d,
+          hora_inicio: f.hora_inicio,
+          hora_fin: f.hora_fin,
+        })),
       );
     }
     await onSubmit(out);
@@ -189,23 +211,41 @@ export function UsuarioForm({
           />
 
           <div className="rounded-xl border border-gray-200 bg-gray-50/50 p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-600 mb-1">Horario de atención</p>
-            <p className="text-xs text-gray-500 mb-3">Un día sin franjas se considera libre.</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-600 mb-1">
+              Horario de atención
+            </p>
+            <p className="text-xs text-gray-500 mb-3">
+              Un día sin franjas se considera libre.
+            </p>
             <div className="grid gap-3 sm:grid-cols-2">
               {DIAS.map((d) => {
                 const franjas = horarios[d];
                 const libre = franjas.length === 0;
                 return (
-                  <div key={d} className={`rounded-lg border p-3 ${libre ? "border-gray-200 bg-white/60" : "border-petcare-200 bg-white"}`}>
+                  <div
+                    key={d}
+                    className={`rounded-lg border p-3 ${libre ? "border-gray-200 bg-white/60" : "border-petcare-200 bg-white"}`}
+                  >
                     <div className="mb-2 flex items-center justify-between">
-                      <h4 className="text-sm font-semibold text-gray-900">{DIA_SEMANA_LABEL[d]}</h4>
-                      {libre && <span className="text-[10px] uppercase tracking-wide text-gray-400">Libre</span>}
+                      <h4 className="text-sm font-semibold text-gray-900">
+                        {DIA_SEMANA_LABEL[d]}
+                      </h4>
+                      {libre && (
+                        <span className="text-[10px] uppercase tracking-wide text-gray-400">
+                          Libre
+                        </span>
+                      )}
                     </div>
-                    <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-3">
                       {franjas.map((f, idx) => (
-                        <div key={idx} className="flex flex-col gap-1.5 rounded-md border border-gray-200 bg-white/80 p-2">
+                        <div
+                          key={idx}
+                          className="flex flex-col gap-3 rounded-md border border-gray-200 bg-white/80 p-3"
+                        >
                           <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Inicio</span>
+                            <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                              Inicio
+                            </span>
                             <button
                               type="button"
                               onClick={() => removeFranja(d, idx)}
@@ -217,12 +257,18 @@ export function UsuarioForm({
                           </div>
                           <TimePicker12h
                             value={f.hora_inicio}
-                            onChange={(v) => updateFranja(d, idx, "hora_inicio", v)}
+                            onChange={(v) =>
+                              updateFranja(d, idx, "hora_inicio", v)
+                            }
                           />
-                          <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Fin</span>
+                          <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                            Fin
+                          </span>
                           <TimePicker12h
                             value={f.hora_fin}
-                            onChange={(v) => updateFranja(d, idx, "hora_fin", v)}
+                            onChange={(v) =>
+                              updateFranja(d, idx, "hora_fin", v)
+                            }
                           />
                         </div>
                       ))}
@@ -239,7 +285,9 @@ export function UsuarioForm({
               })}
             </div>
             {horariosError && (
-              <p className="mt-3 text-xs text-red-600" role="alert">{horariosError}</p>
+              <p className="mt-3 text-xs text-red-600" role="alert">
+                {horariosError}
+              </p>
             )}
           </div>
         </>
