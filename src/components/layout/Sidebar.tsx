@@ -56,7 +56,7 @@ const navItems: NavItem[] = [
     label: "Usuario",
     children: [
       { href: "/clientes", label: "Clientes", module: "clientes" },
-      { href: "/usuarios", label: "Veterinarios", module: "usuarios" },
+      { href: "/usuarios", label: "Staff", module: "usuarios" },
     ],
   },
   { href: "/reportes", icon: BarChart2, label: "Reportes", module: "reportes" },
