@@ -16,7 +16,8 @@ const createSchema = z.object({
 
 export async function GET(req: NextRequest) {
   const session = await getSessionUser();
-  if (!session) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  if (!session)
+    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
 
   const allowed = ["administrador", "veterinario", "recepcionista", "cliente"];
   if (!allowed.includes(session.rol)) {
@@ -30,11 +31,12 @@ export async function GET(req: NextRequest) {
 
   let query = supabase
     .from("historia_clinica")
-    .select("*, mascotas(nombre), veterinarios(usuarios(nombre, apellido)), citas(fecha, hora, motivo)")
+    .select(
+      "*, mascotas(nombre), veterinarios(usuarios(nombre, apellido)), citas(fecha, hora, motivo)",
+    )
     .order("fecha_consulta", { ascending: false });
 
   if (session.rol === "cliente") {
-    // Filtrar solo las historias de las mascotas del cliente
     const { data: clienteData } = await supabase
       .from("clientes")
       .select("id_cliente")
@@ -45,7 +47,9 @@ export async function GET(req: NextRequest) {
       .from("mascotas")
       .select("id_mascota")
       .eq("id_cliente", clienteData.id_cliente);
-    const ids = (mascotas ?? []).map((m: { id_mascota: number }) => m.id_mascota);
+    const ids = (mascotas ?? []).map(
+      (m: { id_mascota: number }) => m.id_mascota,
+    );
     if (ids.length === 0) return NextResponse.json({ data: [] });
     query = query.in("id_mascota", ids);
   } else if (id_mascota) {
@@ -53,20 +57,27 @@ export async function GET(req: NextRequest) {
   }
 
   const { data, error } = await query;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error)
+    return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ data });
 }
 
 export async function POST(req: NextRequest) {
   const session = await getSessionUser();
   if (!session || !["veterinario", "administrador"].includes(session.rol)) {
-    return NextResponse.json({ error: "No autorizado para crear historias clínicas" }, { status: 403 });
+    return NextResponse.json(
+      { error: "No autorizado para crear historias clínicas" },
+      { status: 403 },
+    );
   }
 
   const body = await req.json();
   const parsed = createSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return NextResponse.json(
+      { error: parsed.error.flatten() },
+      { status: 400 },
+    );
   }
 
   const admin = createAdminClient();
@@ -79,8 +90,11 @@ export async function POST(req: NextRequest) {
 
   if (!cita || !["confirmada", "atendida"].includes(cita.estado)) {
     return NextResponse.json(
-      { error: "Solo se puede crear historia clínica de citas confirmadas o atendidas" },
-      { status: 400 }
+      {
+        error:
+          "Solo se puede crear historia clínica de citas confirmadas o atendidas",
+      },
+      { status: 400 },
     );
   }
 
@@ -95,6 +109,20 @@ export async function POST(req: NextRequest) {
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error)
+    return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // ── FASE 4: Registrar auditoría de creación ─────────────────────────────────
+  await admin.from("auditoria_historia_clinica").insert({
+    id_historia: data.id_historia,
+    id_usuario: session.id_usuario,
+    tipo_cambio: "INSERT",
+    diagnostico_nuevo: parsed.data.diagnostico,
+    tratamiento_nuevo: parsed.data.tratamiento,
+    observaciones_nuevo: parsed.data.observaciones ?? null,
+    peso_nuevo: parsed.data.peso_consulta ?? null,
+    razon_cambio: "Creación inicial",
+  });
+
   return NextResponse.json({ data }, { status: 201 });
 }

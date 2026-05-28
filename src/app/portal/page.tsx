@@ -3,1394 +3,501 @@
 import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { PawPrint, CalendarDays, FileText, LogOut, User, ChevronRight, X, CalendarPlus, CheckCircle, Plus, CalendarClock, Syringe, Pencil, KeyRound, Settings } from "lucide-react";
+import {
+  PawPrint, CalendarDays, FileText, LogOut, User, ChevronRight,
+  X, CalendarPlus, Plus, CalendarClock,
+  Clock, ListOrdered,
+} from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
-import { AvailabilityCalendar } from "@/components/ui/availability-calendar";
-import { TimeSlotsGrid } from "@/components/ui/time-slots-grid";
 import { formatLima, format12h } from "@/utils/datetime";
 import { exportHistorialPdf } from "@/utils/historialPdf";
 import type { EstadoCita } from "@/types";
 
-/* ═══ types ═══ */
-interface MascotaRow { id_mascota: number; nombre: string; especie: string; raza: string | null; sexo: string | null; color: string | null; fecha_nacimiento: string | null; peso: number | null; }
-const SEXO_LABEL: Record<string, string> = { macho: "Macho", hembra: "Hembra" };
-interface CitaRow { id_cita: number; id_veterinario: number; fecha: string; hora: string; motivo: string; estado: EstadoCita; mascotas: { nombre: string; especie: string }; veterinarios: { usuarios: { nombre: string; apellido: string } }; }
-interface HistoriaRow { id_historia: number; id_mascota: number; fecha_consulta: string; diagnostico: string; tratamiento: string; observaciones: string | null; peso_consulta: number | null; mascotas: { nombre: string }; veterinarios: { usuarios: { nombre: string; apellido: string } }; }
-interface VetOption { id_veterinario: number; usuarios: { nombre: string; apellido: string } }
+import type { MascotaRow, CitaRow, HistoriaRow, SeguimientoPortal, AlertaVacPortal, AtencionPortal, ColaPortal, Tab } from "./_types";
+import { estadoLabels } from "./_types";
+import { MascotaCard }          from "./_components/MascotaCard";
+import { AlertsSidebar }        from "./_components/AlertsSidebar";
+import { SeguimientosTab }      from "./_components/SeguimientosTab";
+import { ColaEsperaModal }      from "./_components/ColaEsperaModal";
+import { RegisterMascotaModal } from "./_components/RegisterMascotaModal";
+import { EditMascotaModal }     from "./_components/EditMascotaModal";
+import { ProfileModal }         from "./_components/ProfileModal";
+import { RescheduleCitaModal }  from "./_components/RescheduleCitaModal";
+import { BookingModal }         from "./_components/BookingModal";
 
-const estadoLabels: Record<EstadoCita, string> = { pendiente:"Pendiente", confirmada:"Confirmada", cancelada:"Cancelada", atendida:"Atendida" };
-
-function calcEdad(fn: string | null) {
-  if (!fn) return "—";
-  const [by, bm] = fn.split("-").map(Number);
-  const now = new Date();
-  let y = now.getFullYear() - by, m = now.getMonth() + 1 - bm;
-  if (m < 0) { y--; m += 12; }
-  return y > 0 ? `${y} año${y !== 1 ? "s" : ""}` : `${m} mes${m !== 1 ? "es" : ""}`;
-}
-
-function dateToStr(d: Date): string {
-  const y = d.getFullYear();
-  const mo = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${mo}-${day}`;
-}
-
-type Tab = "mascotas" | "citas" | "historial";
-
-/* ═══ Mascota card ═══ */
-function MascotaCard({ m, onEdit }: { m: MascotaRow; onEdit: (mascota: MascotaRow) => void }) {
-  const icons: Record<string,string> = { Perro:"🐕", Gato:"🐈", Ave:"🦜", Conejo:"🐇", Reptil:"🦎", Otro:"🐾" };
-  return (
-    <div style={{ background:"#fff", border:"1px solid #e8e0d0", borderRadius:"16px",
-      padding:"24px", display:"flex", flexDirection:"column", gap:"12px",
-      boxShadow:"0 2px 8px rgba(26,18,8,0.06)", transition:"all 0.2s" }}
-      onMouseEnter={e=>{ (e.currentTarget as HTMLDivElement).style.boxShadow="0 8px 24px rgba(26,18,8,0.12)"; (e.currentTarget as HTMLDivElement).style.transform="translateY(-2px)"; }}
-      onMouseLeave={e=>{ (e.currentTarget as HTMLDivElement).style.boxShadow="0 2px 8px rgba(26,18,8,0.06)"; (e.currentTarget as HTMLDivElement).style.transform="translateY(0)"; }}
-    >
-      <div style={{ display:"flex", alignItems:"center", gap:"14px" }}>
-        <div style={{ width:"56px", height:"56px", borderRadius:"14px", background:"linear-gradient(135deg,#f0fdf4,#dcfce7)",
-          display:"flex", alignItems:"center", justifyContent:"center", fontSize:"1.8rem", flexShrink:0 }}>
-          {icons[m.especie] ?? "🐾"}
-        </div>
-        <div style={{ flex:1, minWidth:0 }}>
-          <p style={{ fontFamily:"var(--font-fraunces)", fontSize:"1.1rem", fontWeight:700, color:"#1a1208", margin:0 }}>{m.nombre}</p>
-          <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.82rem", color:"#8a7a60", margin:0 }}>{m.especie}{m.raza ? ` · ${m.raza}` : ""}{m.color ? ` · ${m.color}` : ""}</p>
-        </div>
-        <button onClick={() => onEdit(m)} title="Editar mascota"
-          style={{ background:"#faf6ef", border:"1px solid #e8e0d0", borderRadius:"9px",
-            width:"34px", height:"34px", cursor:"pointer", display:"flex", alignItems:"center",
-            justifyContent:"center", color:"#6b5c44", flexShrink:0 }}>
-          <Pencil size={14} />
-        </button>
-      </div>
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"8px" }}>
-        {[["Edad", calcEdad(m.fecha_nacimiento)], ["Sexo", m.sexo ? (SEXO_LABEL[m.sexo] ?? m.sexo) : "—"]].map(([l,v])=>(
-          <div key={l} style={{ background:"#faf6ef", borderRadius:"8px", padding:"10px 12px" }}>
-            <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.7rem", fontWeight:600, color:"#8a7a60", textTransform:"uppercase", letterSpacing:"0.08em", margin:0 }}>{l}</p>
-            <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.9rem", fontWeight:600, color:"#1a1208", margin:0 }}>{v}</p>
-          </div>
-        ))}
-      </div>
-      <Link href={`/portal/mascotas/${m.id_mascota}/cartilla`}
-        style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:"6px",
-          background:"#f0fdf4", border:"1px solid #bbf7d0", color:"#16a34a", textDecoration:"none",
-          padding:"8px", borderRadius:"9px", fontFamily:"var(--font-dm-sans)", fontSize:"0.78rem", fontWeight:600 }}>
-        <Syringe size={12} /> Cartilla de vacunas
-      </Link>
-    </div>
-  );
-}
-
-/* ═══ Register pet modal ═══ */
-const especieOpts = ["Perro","Gato","Ave","Conejo","Reptil","Otro"];
-
-function RegisterMascotaModal({ open, onClose, onCreated }: {
-  open: boolean; onClose: () => void; onCreated: () => void;
-}) {
-  const [nombre, setNombre] = useState("");
-  const [especie, setEspecie] = useState("Perro");
-  const [raza, setRaza] = useState("");
-  const [sexo, setSexo] = useState("macho");
-  const [color, setColor] = useState("");
-  const [fechaNac, setFechaNac] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [done, setDone] = useState(false);
-
-  const [prevOpen, setPrevOpen] = useState(open);
-  if (prevOpen !== open) {
-    setPrevOpen(open);
-    if (open) { setNombre(""); setEspecie("Perro"); setRaza(""); setSexo("macho"); setColor(""); setFechaNac(""); setError(null); setDone(false); }
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!nombre.trim()) { setError("El nombre es requerido."); return; }
-    setSubmitting(true); setError(null);
-    try {
-      const res = await fetch("/api/mascotas", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nombre, especie, raza: raza || undefined, sexo, color: color || undefined, fecha_nacimiento: fechaNac || undefined }),
-      });
-      const json = await res.json();
-      if (!res.ok) { setError(json.error ?? "Error al registrar"); return; }
-      setDone(true);
-      onCreated();
-    } catch { setError("Error de conexión"); }
-    finally { setSubmitting(false); }
-  };
-
-  if (!open) return null;
-
-  const inputS: React.CSSProperties = { height:"40px", width:"100%", borderRadius:"9px",
-    border:"1.5px solid #d0c8b8", background:"#fdfaf5", padding:"0 12px",
-    fontSize:"0.875rem", fontFamily:"var(--font-dm-sans)", color:"#1a1208", outline:"none" };
-  const labelS: React.CSSProperties = { fontSize:"0.72rem", fontWeight:700, letterSpacing:"0.07em",
-    textTransform:"uppercase", color:"#6b5c44", fontFamily:"var(--font-dm-sans)", display:"block", marginBottom:"5px" };
-
-  return (
-    <div style={{ position:"fixed", inset:0, zIndex:200, display:"flex", alignItems:"center", justifyContent:"center", padding:"16px" }}>
-      <div style={{ position:"absolute", inset:0, background:"rgba(6,18,9,0.7)", backdropFilter:"blur(8px)" }} onClick={onClose} />
-      <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:"440px", background:"#fff", borderRadius:"24px", overflow:"hidden", boxShadow:"0 32px 80px rgba(10,26,17,0.4)" }}>
-        <div style={{ background:"linear-gradient(135deg,#0a1a11,#0f2318)", padding:"20px 24px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-          <div>
-            <p style={{ fontFamily:"var(--font-fraunces)", fontStyle:"italic", fontSize:"1.1rem", fontWeight:700, color:"#fff", margin:0 }}>
-              {done ? "¡Mascota registrada!" : "Registrar mascota"}
-            </p>
-            <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.75rem", color:"rgba(255,255,255,0.4)", margin:0 }}>Portal del cliente · PetCare</p>
-          </div>
-          <button onClick={onClose} style={{ background:"rgba(255,255,255,0.08)", border:"none", color:"rgba(255,255,255,0.6)", cursor:"pointer", width:"34px", height:"34px", borderRadius:"9px", display:"flex", alignItems:"center", justifyContent:"center" }}>
-            <X size={16} />
-          </button>
-        </div>
-        <div style={{ padding:"24px" }}>
-          {done ? (
-            <div style={{ textAlign:"center", padding:"8px 0" }}>
-              <div style={{ width:"64px", height:"64px", borderRadius:"50%", background:"linear-gradient(135deg,#f0fdf4,#dcfce7)", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px", boxShadow:"0 6px 20px rgba(22,163,74,0.2)" }}>
-                <CheckCircle size={32} color="#16a34a" />
-              </div>
-              <p style={{ fontFamily:"var(--font-fraunces)", fontSize:"1.2rem", fontWeight:700, fontStyle:"italic", color:"#1a1208", margin:"0 0 8px" }}>¡Listo!</p>
-              <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.88rem", color:"#8a7a60", lineHeight:1.6, margin:"0 0 20px" }}>
-                Tu mascota fue registrada. Ya puedes agendar una cita.
-              </p>
-              <button onClick={onClose} style={{ background:"#0a1a11", color:"#fff", border:"none", cursor:"pointer", padding:"12px 28px", borderRadius:"10px", fontFamily:"var(--font-dm-sans)", fontSize:"0.88rem", fontWeight:600 }}>
-                Cerrar
-              </button>
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit} style={{ display:"flex", flexDirection:"column", gap:"14px" }}>
-              <div>
-                <label style={labelS}>Nombre de la mascota</label>
-                <input value={nombre} onChange={e=>setNombre(e.target.value)} required style={inputS} placeholder="Ej: Max" />
-              </div>
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px" }}>
-                <div>
-                  <label style={labelS}>Especie</label>
-                  <select value={especie} onChange={e=>setEspecie(e.target.value)} style={inputS}>
-                    {especieOpts.map(o=><option key={o}>{o}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label style={labelS}>Raza (opcional)</label>
-                  <input value={raza} onChange={e=>setRaza(e.target.value)} style={inputS} placeholder="Ej: Labrador" />
-                </div>
-              </div>
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px" }}>
-                <div>
-                  <label style={labelS}>Sexo</label>
-                  <select value={sexo} onChange={e=>setSexo(e.target.value)} style={inputS}>
-                    <option value="macho">Macho</option>
-                    <option value="hembra">Hembra</option>
-                  </select>
-                </div>
-                <div>
-                  <label style={labelS}>Color (opcional)</label>
-                  <input value={color} onChange={e=>setColor(e.target.value)} style={inputS} placeholder="Ej: marrón y blanco" />
-                </div>
-              </div>
-              <div>
-                <label style={labelS}>Fecha de nacimiento (opcional)</label>
-                <input type="date" value={fechaNac} onChange={e=>setFechaNac(e.target.value)} style={inputS} />
-              </div>
-              <p style={{ fontSize:"0.74rem", color:"#a89a80", fontFamily:"var(--font-dm-sans)", margin:0 }}>
-                El peso se registra en la historia clínica de cada consulta.
-              </p>
-              {error && <p style={{ fontSize:"0.82rem", color:"#dc2626", fontFamily:"var(--font-dm-sans)" }}>{error}</p>}
-              <div style={{ position:"sticky", bottom:0, background:"#fff",
-                borderTop:"1px solid #f0ead8", padding:"12px 0 4px", marginTop:"4px" }}>
-                <button type="submit" disabled={submitting}
-                  style={{ width:"100%", background:"linear-gradient(135deg,#0a1a11,#162e20)", color:"#fff", border:"none",
-                    cursor:submitting?"not-allowed":"pointer", padding:"13px", borderRadius:"12px",
-                    fontSize:"0.9rem", fontWeight:700, fontFamily:"var(--font-dm-sans)", opacity:submitting?0.7:1 }}>
-                  {submitting ? "Registrando…" : "Registrar mascota"}
-                </button>
-              </div>
-            </form>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ═══ Edit pet modal ═══ */
-function EditMascotaModal({ mascota, open, onClose, onSaved }: {
-  mascota: MascotaRow | null; open: boolean; onClose: () => void; onSaved: () => void;
-}) {
-  const [nombre, setNombre] = useState("");
-  const [especie, setEspecie] = useState("Perro");
-  const [raza, setRaza] = useState("");
-  const [sexo, setSexo] = useState("macho");
-  const [color, setColor] = useState("");
-  const [fechaNac, setFechaNac] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [done, setDone] = useState(false);
-
-  const [prevOpen, setPrevOpen] = useState(open);
-  if (prevOpen !== open) {
-    setPrevOpen(open);
-    if (open && mascota) {
-      setNombre(mascota.nombre ?? "");
-      setEspecie(mascota.especie ?? "Perro");
-      setRaza(mascota.raza ?? "");
-      setSexo(mascota.sexo ?? "macho");
-      setColor(mascota.color ?? "");
-      setFechaNac(mascota.fecha_nacimiento ?? "");
-      setError(null);
-      setDone(false);
-    }
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!mascota) return;
-    if (!nombre.trim()) { setError("El nombre es requerido."); return; }
-    setSubmitting(true); setError(null);
-    try {
-      const res = await fetch(`/api/mascotas/${mascota.id_mascota}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          nombre,
-          especie,
-          raza: raza || undefined,
-          sexo,
-          color: color || undefined,
-          fecha_nacimiento: fechaNac || undefined,
-        }),
-      });
-      const json = await res.json();
-      if (!res.ok) { setError(typeof json.error === "string" ? json.error : "Error al guardar"); return; }
-      setDone(true);
-      onSaved();
-    } catch { setError("Error de conexión"); }
-    finally { setSubmitting(false); }
-  };
-
-  if (!open || !mascota) return null;
-
-  const inputS: React.CSSProperties = { height:"40px", width:"100%", borderRadius:"9px",
-    border:"1.5px solid #d0c8b8", background:"#fdfaf5", padding:"0 12px",
-    fontSize:"0.875rem", fontFamily:"var(--font-dm-sans)", color:"#1a1208", outline:"none" };
-  const labelS: React.CSSProperties = { fontSize:"0.72rem", fontWeight:700, letterSpacing:"0.07em",
-    textTransform:"uppercase", color:"#6b5c44", fontFamily:"var(--font-dm-sans)", display:"block", marginBottom:"5px" };
-
-  return (
-    <div style={{ position:"fixed", inset:0, zIndex:200, display:"flex", alignItems:"center", justifyContent:"center", padding:"16px" }}>
-      <div style={{ position:"absolute", inset:0, background:"rgba(6,18,9,0.7)", backdropFilter:"blur(8px)" }} onClick={onClose} />
-      <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:"440px", background:"#fff", borderRadius:"24px", overflow:"hidden", boxShadow:"0 32px 80px rgba(10,26,17,0.4)", maxHeight:"90vh", display:"flex", flexDirection:"column" }}>
-        <div style={{ background:"linear-gradient(135deg,#0a1a11,#0f2318)", padding:"20px 24px", display:"flex", alignItems:"center", justifyContent:"space-between", flexShrink:0 }}>
-          <div>
-            <p style={{ fontFamily:"var(--font-fraunces)", fontStyle:"italic", fontSize:"1.1rem", fontWeight:700, color:"#fff", margin:0 }}>
-              {done ? "¡Cambios guardados!" : "Editar mascota"}
-            </p>
-            <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.75rem", color:"rgba(255,255,255,0.4)", margin:0 }}>Portal del cliente · PetCare</p>
-          </div>
-          <button onClick={onClose} style={{ background:"rgba(255,255,255,0.08)", border:"none", color:"rgba(255,255,255,0.6)", cursor:"pointer", width:"34px", height:"34px", borderRadius:"9px", display:"flex", alignItems:"center", justifyContent:"center" }}>
-            <X size={16} />
-          </button>
-        </div>
-        <div style={{ padding:"24px", overflowY:"auto" }}>
-          {done ? (
-            <div style={{ textAlign:"center", padding:"8px 0" }}>
-              <div style={{ width:"64px", height:"64px", borderRadius:"50%", background:"linear-gradient(135deg,#f0fdf4,#dcfce7)", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px", boxShadow:"0 6px 20px rgba(22,163,74,0.2)" }}>
-                <CheckCircle size={32} color="#16a34a" />
-              </div>
-              <p style={{ fontFamily:"var(--font-fraunces)", fontSize:"1.2rem", fontWeight:700, fontStyle:"italic", color:"#1a1208", margin:"0 0 8px" }}>¡Listo!</p>
-              <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.88rem", color:"#8a7a60", lineHeight:1.6, margin:"0 0 20px" }}>
-                Los datos de {nombre} fueron actualizados.
-              </p>
-              <button onClick={onClose} style={{ background:"#0a1a11", color:"#fff", border:"none", cursor:"pointer", padding:"12px 28px", borderRadius:"10px", fontFamily:"var(--font-dm-sans)", fontSize:"0.88rem", fontWeight:600 }}>
-                Cerrar
-              </button>
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit} style={{ display:"flex", flexDirection:"column", gap:"14px" }}>
-              <div>
-                <label style={labelS}>Nombre de la mascota</label>
-                <input value={nombre} onChange={e=>setNombre(e.target.value)} required style={inputS} placeholder="Ej: Max" />
-              </div>
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px" }}>
-                <div>
-                  <label style={labelS}>Especie</label>
-                  <select value={especie} onChange={e=>setEspecie(e.target.value)} style={inputS}>
-                    {especieOpts.map(o=><option key={o}>{o}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label style={labelS}>Raza (opcional)</label>
-                  <input value={raza} onChange={e=>setRaza(e.target.value)} style={inputS} placeholder="Ej: Labrador" />
-                </div>
-              </div>
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px" }}>
-                <div>
-                  <label style={labelS}>Sexo</label>
-                  <select value={sexo} onChange={e=>setSexo(e.target.value)} style={inputS}>
-                    <option value="macho">Macho</option>
-                    <option value="hembra">Hembra</option>
-                  </select>
-                </div>
-                <div>
-                  <label style={labelS}>Color (opcional)</label>
-                  <input value={color} onChange={e=>setColor(e.target.value)} style={inputS} placeholder="Ej: marrón y blanco" />
-                </div>
-              </div>
-              <div>
-                <label style={labelS}>Fecha de nacimiento (opcional)</label>
-                <input type="date" value={fechaNac} onChange={e=>setFechaNac(e.target.value)} style={inputS} />
-              </div>
-              {error && <p style={{ fontSize:"0.82rem", color:"#dc2626", fontFamily:"var(--font-dm-sans)" }}>{error}</p>}
-              <div style={{ position:"sticky", bottom:0, background:"#fff",
-                borderTop:"1px solid #f0ead8", padding:"12px 0 4px", marginTop:"4px" }}>
-                <button type="submit" disabled={submitting}
-                  style={{ width:"100%", background:"linear-gradient(135deg,#0a1a11,#162e20)", color:"#fff", border:"none",
-                    cursor:submitting?"not-allowed":"pointer", padding:"13px", borderRadius:"12px",
-                    fontSize:"0.9rem", fontWeight:700, fontFamily:"var(--font-dm-sans)", opacity:submitting?0.7:1 }}>
-                  {submitting ? "Guardando…" : "Guardar cambios"}
-                </button>
-              </div>
-            </form>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ═══ Profile modal ═══ */
-interface ProfileData {
-  id_cliente: number;
-  telefono: string;
-  direccion: string | null;
-  usuarios: { id_usuario: number; nombre: string; apellido: string; correo: string };
-}
-
-function ProfileModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const [view, setView] = useState<"datos" | "password">("datos");
-  const [loading, setLoading] = useState(false);
-  const [profile, setProfile] = useState<ProfileData | null>(null);
-  const [telefono, setTelefono] = useState("");
-  const [direccion, setDireccion] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [savedMsg, setSavedMsg] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-
-  // Password fields
-  const [pwActual, setPwActual] = useState("");
-  const [pwNueva, setPwNueva] = useState("");
-  const [pwConfirmar, setPwConfirmar] = useState("");
-  const [showPw, setShowPw] = useState(false);
-
-  const [prevOpen, setPrevOpen] = useState(open);
-  if (prevOpen !== open) {
-    setPrevOpen(open);
-    if (open) {
-      setView("datos"); setError(null); setSavedMsg(null);
-      setPwActual(""); setPwNueva(""); setPwConfirmar(""); setShowPw(false);
-      setLoading(true);
-      fetch("/api/portal/perfil")
-        .then(r => r.json())
-        .then(j => {
-          if (j?.data) {
-            setProfile(j.data);
-            setTelefono(j.data.telefono ?? "");
-            setDireccion(j.data.direccion ?? "");
-          }
-        })
-        .catch(() => setError("No se pudo cargar el perfil"))
-        .finally(() => setLoading(false));
-    }
-  }
-
-  const handleSaveDatos = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (telefono.trim().length < 7) { setError("Teléfono inválido (mínimo 7 dígitos)."); return; }
-    setSubmitting(true); setError(null); setSavedMsg(null);
-    try {
-      const res = await fetch("/api/portal/perfil", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ telefono, direccion: direccion || undefined }),
-      });
-      const json = await res.json();
-      if (!res.ok) { setError(typeof json.error === "string" ? json.error : "Error al guardar"); return; }
-      setSavedMsg("Datos personales actualizados.");
-    } catch { setError("Error de conexión"); }
-    finally { setSubmitting(false); }
-  };
-
-  const handleChangePw = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null); setSavedMsg(null);
-    if (pwNueva !== pwConfirmar) { setError("Las contraseñas no coinciden."); return; }
-    if (pwNueva.length < 8) { setError("La nueva contraseña debe tener al menos 8 caracteres."); return; }
-    setSubmitting(true);
-    try {
-      const res = await fetch("/api/portal/perfil", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contrasena_actual: pwActual, contrasena: pwNueva }),
-      });
-      const json = await res.json();
-      if (!res.ok) { setError(typeof json.error === "string" ? json.error : "Error al cambiar contraseña"); return; }
-      setSavedMsg("Contraseña actualizada correctamente.");
-      setPwActual(""); setPwNueva(""); setPwConfirmar("");
-    } catch { setError("Error de conexión"); }
-    finally { setSubmitting(false); }
-  };
-
-  if (!open) return null;
-
-  const inputS: React.CSSProperties = { height:"40px", width:"100%", borderRadius:"9px",
-    border:"1.5px solid #d0c8b8", background:"#fdfaf5", padding:"0 12px",
-    fontSize:"0.875rem", fontFamily:"var(--font-dm-sans)", color:"#1a1208", outline:"none" };
-  const labelS: React.CSSProperties = { fontSize:"0.72rem", fontWeight:700, letterSpacing:"0.07em",
-    textTransform:"uppercase", color:"#6b5c44", fontFamily:"var(--font-dm-sans)", display:"block", marginBottom:"5px" };
-  const readonlyS: React.CSSProperties = { ...inputS, background:"#f5f0e8", color:"#8a7a60", cursor:"not-allowed" };
-  const tabBtnS = (active: boolean): React.CSSProperties => ({
-    flex:1, padding:"10px 12px", border:"none", cursor:"pointer", borderRadius:"9px",
-    fontFamily:"var(--font-dm-sans)", fontSize:"0.82rem", fontWeight: active ? 700 : 500,
-    background: active ? "#0a1a11" : "transparent", color: active ? "#fff" : "#6b5c44",
-    display:"flex", alignItems:"center", justifyContent:"center", gap:"6px",
-  });
-
-  return (
-    <div style={{ position:"fixed", inset:0, zIndex:200, display:"flex", alignItems:"center", justifyContent:"center", padding:"16px" }}>
-      <div style={{ position:"absolute", inset:0, background:"rgba(6,18,9,0.7)", backdropFilter:"blur(8px)" }} onClick={onClose} />
-      <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:"480px", background:"#fff", borderRadius:"24px", overflow:"hidden", boxShadow:"0 32px 80px rgba(10,26,17,0.4)", maxHeight:"90vh", display:"flex", flexDirection:"column" }}>
-        <div style={{ background:"linear-gradient(135deg,#0a1a11,#0f2318)", padding:"20px 24px", display:"flex", alignItems:"center", justifyContent:"space-between", flexShrink:0 }}>
-          <div>
-            <p style={{ fontFamily:"var(--font-fraunces)", fontStyle:"italic", fontSize:"1.1rem", fontWeight:700, color:"#fff", margin:0 }}>
-              Mi perfil
-            </p>
-            <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.75rem", color:"rgba(255,255,255,0.4)", margin:0 }}>
-              Portal del cliente · PetCare
-            </p>
-          </div>
-          <button onClick={onClose} style={{ background:"rgba(255,255,255,0.08)", border:"none", color:"rgba(255,255,255,0.6)", cursor:"pointer", width:"34px", height:"34px", borderRadius:"9px", display:"flex", alignItems:"center", justifyContent:"center" }}>
-            <X size={16} />
-          </button>
-        </div>
-
-        <div style={{ padding:"20px 24px 8px", flexShrink:0 }}>
-          <div style={{ display:"flex", gap:"4px", background:"#ede7d9", padding:"4px", borderRadius:"11px" }}>
-            <button onClick={() => { setView("datos"); setError(null); setSavedMsg(null); }} style={tabBtnS(view==="datos")}>
-              <Settings size={13} /> Datos
-            </button>
-            <button onClick={() => { setView("password"); setError(null); setSavedMsg(null); }} style={tabBtnS(view==="password")}>
-              <KeyRound size={13} /> Contraseña
-            </button>
-          </div>
-        </div>
-
-        <div style={{ padding:"16px 24px 24px", overflowY:"auto" }}>
-          {loading ? (
-            <div style={{ textAlign:"center", padding:"40px 0", color:"#8a7a60", fontFamily:"var(--font-dm-sans)", fontSize:"0.88rem" }}>
-              Cargando…
-            </div>
-          ) : view === "datos" ? (
-            <form onSubmit={handleSaveDatos} style={{ display:"flex", flexDirection:"column", gap:"14px" }}>
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px" }}>
-                <div>
-                  <label style={labelS}>Nombre</label>
-                  <input value={profile?.usuarios.nombre ?? ""} readOnly style={readonlyS} />
-                </div>
-                <div>
-                  <label style={labelS}>Apellido</label>
-                  <input value={profile?.usuarios.apellido ?? ""} readOnly style={readonlyS} />
-                </div>
-              </div>
-              <div>
-                <label style={labelS}>Correo</label>
-                <input value={profile?.usuarios.correo ?? ""} readOnly style={readonlyS} />
-                <p style={{ fontSize:"0.72rem", color:"#a89a80", fontFamily:"var(--font-dm-sans)", margin:"4px 0 0" }}>
-                  Para cambiar el nombre o el correo, contacta con recepción.
-                </p>
-              </div>
-              <div>
-                <label style={labelS}>Teléfono</label>
-                <input value={telefono} onChange={e=>setTelefono(e.target.value)} required style={inputS} placeholder="Ej: 987654321" />
-              </div>
-              <div>
-                <label style={labelS}>Dirección (opcional)</label>
-                <input value={direccion} onChange={e=>setDireccion(e.target.value)} style={inputS} placeholder="Ej: Av. Larco 123" />
-              </div>
-              {error && <p style={{ fontSize:"0.82rem", color:"#dc2626", fontFamily:"var(--font-dm-sans)", margin:0 }}>{error}</p>}
-              {savedMsg && <p style={{ fontSize:"0.82rem", color:"#16a34a", fontFamily:"var(--font-dm-sans)", margin:0 }}>{savedMsg}</p>}
-              <button type="submit" disabled={submitting}
-                style={{ width:"100%", background:"linear-gradient(135deg,#0a1a11,#162e20)", color:"#fff", border:"none",
-                  cursor:submitting?"not-allowed":"pointer", padding:"13px", borderRadius:"12px",
-                  fontSize:"0.9rem", fontWeight:700, fontFamily:"var(--font-dm-sans)", opacity:submitting?0.7:1, marginTop:"4px" }}>
-                {submitting ? "Guardando…" : "Guardar cambios"}
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={handleChangePw} style={{ display:"flex", flexDirection:"column", gap:"14px" }}>
-              <div>
-                <label style={labelS}>Contraseña actual</label>
-                <input type={showPw ? "text" : "password"} value={pwActual} onChange={e=>setPwActual(e.target.value)} required style={inputS} placeholder="••••••••" autoComplete="current-password" />
-              </div>
-              <div>
-                <label style={labelS}>Nueva contraseña</label>
-                <input type={showPw ? "text" : "password"} value={pwNueva} onChange={e=>setPwNueva(e.target.value)} required style={inputS} placeholder="••••••••" autoComplete="new-password" />
-                <p style={{ fontSize:"0.72rem", color:"#a89a80", fontFamily:"var(--font-dm-sans)", margin:"4px 0 0" }}>
-                  Mínimo 8 caracteres con mayúscula, minúscula, número y símbolo.
-                </p>
-              </div>
-              <div>
-                <label style={labelS}>Confirmar nueva contraseña</label>
-                <input type={showPw ? "text" : "password"} value={pwConfirmar} onChange={e=>setPwConfirmar(e.target.value)} required style={inputS} placeholder="••••••••" autoComplete="new-password" />
-              </div>
-              <label style={{ display:"flex", alignItems:"center", gap:"8px", fontSize:"0.82rem", fontFamily:"var(--font-dm-sans)", color:"#6b5c44", cursor:"pointer" }}>
-                <input type="checkbox" checked={showPw} onChange={e=>setShowPw(e.target.checked)} />
-                Mostrar contraseñas
-              </label>
-              {error && <p style={{ fontSize:"0.82rem", color:"#dc2626", fontFamily:"var(--font-dm-sans)", margin:0 }}>{error}</p>}
-              {savedMsg && <p style={{ fontSize:"0.82rem", color:"#16a34a", fontFamily:"var(--font-dm-sans)", margin:0 }}>{savedMsg}</p>}
-              <button type="submit" disabled={submitting}
-                style={{ width:"100%", background:"linear-gradient(135deg,#0a1a11,#162e20)", color:"#fff", border:"none",
-                  cursor:submitting?"not-allowed":"pointer", padding:"13px", borderRadius:"12px",
-                  fontSize:"0.9rem", fontWeight:700, fontFamily:"var(--font-dm-sans)", opacity:submitting?0.7:1, marginTop:"4px" }}>
-                {submitting ? "Cambiando…" : "Cambiar contraseña"}
-              </button>
-            </form>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ═══ Reschedule modal ═══ */
-function RescheduleCitaModal({ cita, open, onClose, onRescheduled }: {
-  cita: CitaRow | null; open: boolean; onClose: () => void; onRescheduled: () => void;
-}) {
-  const [selectedDay, setSelectedDay] = useState<Date | undefined>();
-  const [fecha, setFecha] = useState("");
-  const [hora, setHora] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [done, setDone] = useState(false);
-
-  const [prevOpen, setPrevOpen] = useState(open);
-  if (prevOpen !== open) {
-    setPrevOpen(open);
-    if (open) { setSelectedDay(undefined); setFecha(""); setHora(""); setError(null); setDone(false); }
-  }
-
-  const handleDaySelect = (date: Date | undefined) => {
-    setSelectedDay(date);
-    if (!date) { setFecha(""); setHora(""); return; }
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, "0");
-    const d = String(date.getDate()).padStart(2, "0");
-    setFecha(`${y}-${m}-${d}`);
-    setHora("");
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!hora || !fecha || !cita) { setError("Selecciona fecha y hora."); return; }
-    setSubmitting(true); setError(null);
-    try {
-      const res = await fetch(`/api/citas/${cita.id_cita}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fecha, hora }),
-      });
-      const json = await res.json();
-      if (!res.ok) { setError(json.error ?? "Error al reprogramar"); return; }
-      setDone(true);
-      onRescheduled();
-    } catch { setError("Error de conexión"); }
-    finally { setSubmitting(false); }
-  };
-
-  if (!open || !cita) return null;
-
-  return (
-    <div style={{ position:"fixed", inset:0, zIndex:200, display:"flex", alignItems:"center", justifyContent:"center", padding:"16px" }}>
-      <div style={{ position:"absolute", inset:0, background:"rgba(6,18,9,0.7)", backdropFilter:"blur(8px)" }} onClick={onClose} />
-      <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:"500px", background:"#fff",
-        borderRadius:"24px", overflow:"hidden", boxShadow:"0 32px 80px rgba(10,26,17,0.4)",
-        display:"flex", flexDirection:"column", maxHeight:"90vh" }}>
-
-        {/* Header sticky */}
-        <div style={{ background:"linear-gradient(135deg,#0a1a11,#0f2318)", padding:"20px 24px",
-          display:"flex", alignItems:"center", justifyContent:"space-between", flexShrink:0 }}>
-          <div>
-            <p style={{ fontFamily:"var(--font-fraunces)", fontStyle:"italic", fontSize:"1.1rem", fontWeight:700, color:"#fff", margin:0 }}>
-              {done ? "¡Cita reprogramada!" : "Cambiar fecha y hora"}
-            </p>
-            <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.75rem", color:"rgba(255,255,255,0.4)", margin:0 }}>
-              {cita.mascotas?.nombre} · {cita.motivo}
-            </p>
-          </div>
-          <button onClick={onClose} style={{ background:"rgba(255,255,255,0.08)", border:"none", color:"rgba(255,255,255,0.6)", cursor:"pointer", width:"34px", height:"34px", borderRadius:"9px", display:"flex", alignItems:"center", justifyContent:"center" }}>
-            <X size={16} />
-          </button>
-        </div>
-
-        {/* Scrollable content */}
-        <div style={{ overflowY:"auto", flex:1, padding:"24px" }}>
-          {done ? (
-            <div style={{ textAlign:"center", padding:"16px 0" }}>
-              <div style={{ width:"64px", height:"64px", borderRadius:"50%", background:"linear-gradient(135deg,#f0fdf4,#dcfce7)", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px", boxShadow:"0 6px 20px rgba(22,163,74,0.2)" }}>
-                <CheckCircle size={32} color="#16a34a" />
-              </div>
-              <p style={{ fontFamily:"var(--font-fraunces)", fontSize:"1.2rem", fontWeight:700, fontStyle:"italic", color:"#1a1208", margin:"0 0 8px" }}>¡Listo!</p>
-              <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.88rem", color:"#8a7a60", lineHeight:1.6, margin:"0 0 20px" }}>
-                Tu cita fue reprogramada para el <strong>{fecha}</strong> a las <strong>{format12h(hora)}</strong>.
-              </p>
-              <button onClick={onClose} style={{ background:"#0a1a11", color:"#fff", border:"none", cursor:"pointer", padding:"12px 28px", borderRadius:"10px", fontFamily:"var(--font-dm-sans)", fontSize:"0.88rem", fontWeight:600 }}>
-                Cerrar
-              </button>
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit} style={{ display:"flex", flexDirection:"column", gap:"18px" }}>
-              <div>
-                <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.72rem", fontWeight:700, letterSpacing:"0.07em", textTransform:"uppercase", color:"#6b5c44", marginBottom:"8px" }}>
-                  Nueva fecha
-                </p>
-                <AvailabilityCalendar selected={selectedDay} onSelect={handleDaySelect} />
-              </div>
-
-              {fecha && (
-                <TimeSlotsGrid
-                  fecha={fecha}
-                  idVeterinario={cita.id_veterinario}
-                  selected={hora}
-                  onSelect={setHora}
-                />
-              )}
-
-              {error && <p style={{ fontSize:"0.82rem", color:"#dc2626", fontFamily:"var(--font-dm-sans)" }}>{error}</p>}
-
-              <div style={{ position:"sticky", bottom:0, background:"#fff", borderTop:"1px solid #f0ead8", padding:"12px 0 4px", marginTop:"4px" }}>
-                <button type="submit" disabled={submitting || !hora}
-                  style={{ width:"100%", background:"linear-gradient(135deg,#3d845b,#2d6647)", color:"#fff",
-                    border:"none", cursor:(submitting || !hora) ? "not-allowed" : "pointer",
-                    padding:"13px", borderRadius:"12px", fontSize:"0.9rem", fontWeight:700,
-                    fontFamily:"var(--font-dm-sans)", opacity:(submitting || !hora) ? 0.6 : 1 }}>
-                  {submitting ? "Guardando…" : "Confirmar cambio"}
-                </button>
-              </div>
-            </form>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ═══ Booking modal ═══ */
-type BookStep = "form" | "success";
-
-function BookingModal({ open, onClose, mascotas, onBooked }: {
-  open: boolean; onClose: () => void;
-  mascotas: MascotaRow[];
-  onBooked: () => void;
-}) {
-  const [step, setStep] = useState<BookStep>("form");
-  const [vets, setVets] = useState<VetOption[]>([]);
-  const [selectedDay, setSelectedDay] = useState<Date | undefined>();
-  const [fecha, setFecha] = useState("");
-  const [hora, setHora] = useState("");
-  const [idMascota, setIdMascota] = useState("");
-  const [idVet, setIdVet] = useState("");
-  const [motivo, setMotivo] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    fetch("/api/veterinarios").then(r=>r.json()).then(j=>setVets(j.data ?? []));
-  }, []);
-
-  // Reset when opened
-  const [prevOpen, setPrevOpen] = useState(open);
-  if (prevOpen !== open) {
-    setPrevOpen(open);
-    if (open) {
-      setStep("form"); setSelectedDay(undefined); setFecha(""); setHora("");
-      setIdMascota(""); setIdVet(vets[0]?.id_veterinario.toString() ?? ""); setMotivo(""); setError(null);
-    }
-  }
-
-  // Auto-asignar primer veterinario en cuanto se cargan, sin useEffect.
-  const [prevVetsCount, setPrevVetsCount] = useState(vets.length);
-  if (prevVetsCount !== vets.length) {
-    setPrevVetsCount(vets.length);
-    if (vets.length > 0 && !idVet) setIdVet(vets[0].id_veterinario.toString());
-  }
-
-  const handleDaySelect = (date: Date | undefined) => {
-    setSelectedDay(date);
-    setFecha(date ? dateToStr(date) : "");
-    setHora("");
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!idMascota || !idVet || !fecha || !hora || !motivo) {
-      setError("Completa todos los campos."); return;
-    }
-    setSubmitting(true); setError(null);
-    try {
-      const res = await fetch("/api/citas", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id_mascota: Number(idMascota),
-          id_veterinario: Number(idVet),
-          fecha, hora, motivo, origen: "portal",
-        }),
-      });
-      const json = await res.json();
-      if (!res.ok) { setError(json.error ?? "Error al agendar la cita"); return; }
-      setStep("success");
-      onBooked();
-    } catch { setError("Error de conexión"); }
-    finally { setSubmitting(false); }
-  };
-
-  if (!open) return null;
-
-  const labelStyle: React.CSSProperties = {
-    fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.07em",
-    textTransform: "uppercase", color: "#6b5c44",
-    fontFamily: "var(--font-dm-sans)", display: "block", marginBottom: "6px",
-  };
-  const selectStyle: React.CSSProperties = {
-    height: "40px", width: "100%", borderRadius: "9px", border: "1.5px solid #d0c8b8",
-    background: "#fdfaf5", padding: "0 12px", fontSize: "0.875rem",
-    fontFamily: "var(--font-dm-sans)", color: "#1a1208", outline: "none",
-  };
-
-  return (
-    <div style={{ position:"fixed", inset:0, zIndex:200, display:"flex", alignItems:"center",
-      justifyContent:"center", padding:"16px" }}>
-      <div style={{ position:"absolute", inset:0, background:"rgba(6,18,9,0.7)", backdropFilter:"blur(8px)" }}
-        onClick={onClose} />
-      <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:"520px",
-        background:"#fff", borderRadius:"24px", overflow:"hidden",
-        boxShadow:"0 32px 80px rgba(10,26,17,0.4)", maxHeight:"90vh", overflowY:"auto" }}>
-
-        {/* Header */}
-        <div style={{ background:"linear-gradient(135deg,#0a1a11,#0f2318)", padding:"20px 24px",
-          display:"flex", alignItems:"center", justifyContent:"space-between", position:"sticky", top:0, zIndex:10 }}>
-          <div>
-            <p style={{ fontFamily:"var(--font-fraunces)", fontStyle:"italic", fontSize:"1.1rem",
-              fontWeight:700, color:"#fff", margin:0 }}>
-              {step === "success" ? "¡Cita agendada!" : "Agendar una cita"}
-            </p>
-            <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.75rem", color:"rgba(255,255,255,0.4)", margin:0 }}>
-              Portal del cliente · PetCare
-            </p>
-          </div>
-          <button onClick={onClose} style={{ background:"rgba(255,255,255,0.08)", border:"none",
-            color:"rgba(255,255,255,0.6)", cursor:"pointer", width:"34px", height:"34px",
-            borderRadius:"9px", display:"flex", alignItems:"center", justifyContent:"center" }}>
-            <X size={16} />
-          </button>
-        </div>
-
-        <div style={{ padding:"24px" }}>
-          {step === "success" ? (
-            <div style={{ textAlign:"center", padding:"16px 0" }}>
-              <div style={{ width:"72px", height:"72px", borderRadius:"50%",
-                background:"linear-gradient(135deg,#f0fdf4,#dcfce7)", display:"flex",
-                alignItems:"center", justifyContent:"center", margin:"0 auto 20px",
-                boxShadow:"0 8px 24px rgba(22,163,74,0.2)" }}>
-                <CheckCircle size={36} color="#16a34a" />
-              </div>
-              <h3 style={{ fontFamily:"var(--font-fraunces)", fontSize:"1.3rem", fontWeight:700,
-                fontStyle:"italic", color:"#1a1208", margin:"0 0 10px" }}>¡Solicitud enviada!</h3>
-              <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.88rem", color:"#8a7a60",
-                lineHeight:1.6, margin:"0 0 24px" }}>
-                Tu cita fue agendada. Recibirás una confirmación del equipo de PetCare.
-              </p>
-              <button onClick={onClose} style={{ background:"#0a1a11", color:"#fff", border:"none",
-                cursor:"pointer", padding:"12px 32px", borderRadius:"10px",
-                fontFamily:"var(--font-dm-sans)", fontSize:"0.88rem", fontWeight:600 }}>
-                Cerrar
-              </button>
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit} style={{ display:"flex", flexDirection:"column", gap:"18px" }}>
-              {/* Mascota */}
-              <div>
-                <label style={labelStyle}>Mascota</label>
-                <select style={selectStyle} value={idMascota}
-                  onChange={e=>{ setIdMascota(e.target.value); }}>
-                  <option value="">Seleccionar mascota…</option>
-                  {mascotas.map(m => (
-                    <option key={m.id_mascota} value={m.id_mascota}>{m.nombre} ({m.especie})</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Calendario */}
-              <div>
-                <label style={labelStyle}>Fecha</label>
-                <AvailabilityCalendar selected={selectedDay} onSelect={handleDaySelect} />
-              </div>
-
-              {/* Veterinario — se elige después de la fecha */}
-              {fecha && (
-                <div>
-                  <label style={labelStyle}>Veterinario</label>
-                  <select style={selectStyle} value={idVet}
-                    onChange={e=>{ setIdVet(e.target.value); setHora(""); }}>
-                    <option value="">Seleccionar veterinario…</option>
-                    {vets.map(v => (
-                      <option key={v.id_veterinario} value={v.id_veterinario}>
-                        {v.usuarios.nombre} {v.usuarios.apellido}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {/* Grid de horarios — disponibilidad real del veterinario */}
-              {fecha && idVet && (
-                <TimeSlotsGrid
-                  fecha={fecha}
-                  idVeterinario={idVet}
-                  selected={hora}
-                  onSelect={setHora}
-                />
-              )}
-
-              {/* Motivo */}
-              <div>
-                <label style={labelStyle}>Motivo de la consulta</label>
-                <textarea value={motivo} onChange={e=>setMotivo(e.target.value)}
-                  placeholder="Describe brevemente el motivo…"
-                  style={{ ...selectStyle, height:"80px", padding:"10px 12px", resize:"none" } as React.CSSProperties}
-                  rows={3} />
-              </div>
-
-              {error && (
-                <p style={{ fontSize:"0.82rem", color:"#dc2626", fontFamily:"var(--font-dm-sans)" }}>{error}</p>
-              )}
-
-              <div style={{ position:"sticky", bottom:0, background:"#fff",
-                borderTop:"1px solid #f0ead8", padding:"12px 0 4px", marginTop:"4px" }}>
-                <button type="submit" disabled={submitting || !hora || !idMascota || !motivo}
-                  style={{ width:"100%", background: "linear-gradient(135deg,#c48c34,#a07028)", color:"#fff",
-                    border:"none", cursor: (submitting || !hora || !idMascota || !motivo) ? "not-allowed" : "pointer",
-                    padding:"14px", borderRadius:"12px", fontSize:"0.9rem", fontWeight:700,
-                    fontFamily:"var(--font-dm-sans)",
-                    opacity: (submitting || !hora || !idMascota || !motivo) ? 0.6 : 1 }}>
-                  {submitting ? "Agendando…" : "Confirmar cita"}
-                </button>
-              </div>
-            </form>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ═══ ROOT ═══ */
 export default function PortalPage() {
   const { user, logout } = useAuth();
-  const [tab, setTab] = useState<Tab>("mascotas");
-  const [mascotas, setMascotas] = useState<MascotaRow[]>([]);
-  const [citas, setCitas] = useState<CitaRow[]>([]);
-  const [historias, setHistorias] = useState<HistoriaRow[]>([]);
-  const [loadingTab, setLoadingTab] = useState(false);
-  const [detailCita, setDetailCita] = useState<CitaRow | null>(null);
-  const [showLogout, setShowLogout] = useState(false);
-  const [bookingOpen, setBookingOpen] = useState(false);
+
+  // ── Tab & data state ───────────────────────────────────────────────────────
+  const [tab, setTab]               = useState<Tab>("mascotas");
+  const [mascotas, setMascotas]     = useState<MascotaRow[]>([]);
+  const [citas, setCitas]           = useState<CitaRow[]>([]);
+  const [historias, setHistorias]   = useState<HistoriaRow[]>([]);
+  const [seguimientos, setSeguimientos] = useState<SeguimientoPortal[]>([]);
+  const [alertasVac, setAlertasVac] = useState<AlertaVacPortal[]>([]);
+  const [atencionesActivas, setAtencionesActivas] = useState<AtencionPortal[]>([]);
+  const [colaEsperaActiva, setColaEsperaActiva]   = useState<ColaPortal[]>([]);
+  const [historialMascotaId, setHistorialMascotaId] = useState<number | "all">("all");
+
+  // loading arranca en true para la carga inicial — evita setState síncrono en el effect
+  const [loadingTab, setLoadingTab] = useState(true);
+
+  // ── Modal state ────────────────────────────────────────────────────────────
+  const [detailCita, setDetailCita]           = useState<CitaRow | null>(null);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [bookingOpen, setBookingOpen]         = useState(false);
+  const [bookingPrefill, setBookingPrefill]   = useState<{ motivo?: string; mascotaId?: number }>({});
   const [mascotaModalOpen, setMascotaModalOpen] = useState(false);
-  const [rescheduleItem, setRescheduleItem] = useState<CitaRow | null>(null);
-  const [editMascota, setEditMascota] = useState<MascotaRow | null>(null);
-  const [profileOpen, setProfileOpen] = useState(false);
+  const [rescheduleItem, setRescheduleItem]   = useState<CitaRow | null>(null);
+  const [editMascota, setEditMascota]         = useState<MascotaRow | null>(null);
+  const [profileOpen, setProfileOpen]         = useState(false);
   const [noMascotasAlert, setNoMascotasAlert] = useState(false);
-  // Lectura síncrona del query param: evita setState dentro de un efecto.
+  const [colaOpen, setColaOpen]               = useState(false);
+
   const [verifiedBanner, setVerifiedBanner] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     return new URLSearchParams(window.location.search).get("verified") === "1";
   });
+  // ID de cita a confirmar automáticamente (llegado por email link ?confirmar=N)
+  const [confirmandoCitaId, setConfirmandoCitaId] = useState<number | null>(() => {
+    if (typeof window === "undefined") return null;
+    const v = new URLSearchParams(window.location.search).get("confirmar");
+    return v ? Number(v) : null;
+  });
 
-  const [historialMascotaId, setHistorialMascotaId] = useState<number | "all">("all");
-
+  // ── Auth redirect ──────────────────────────────────────────────────────────
   useEffect(() => {
     const stored = sessionStorage.getItem("petcare_user");
     if (stored) {
       const u = JSON.parse(stored) as { rol: string };
-      if (u.rol !== "cliente") { window.location.href = "/dashboard"; }
+      if (u.rol !== "cliente") window.location.href = "/dashboard";
       return;
     }
-    // Sin sesión en sessionStorage — recuperar desde la cookie (p. ej. al verificar el correo)
-    fetch("/api/auth/session")
-      .then((r) => r.json())
-      .then((j) => {
-        if (j?.user?.rol === "cliente") {
-          sessionStorage.setItem("petcare_user", JSON.stringify(j.user));
-          sessionStorage.setItem("petcare_session_exp", String(Date.now() + 8 * 60 * 60 * 1000));
-          window.location.reload();
-        } else if (j?.user) {
-          window.location.href = "/dashboard";
-        } else {
-          window.location.href = "/";
-        }
-      })
-      .catch(() => { window.location.href = "/"; });
+    fetch("/api/auth/session").then(r=>r.json()).then(j=>{
+      if (j?.user?.rol === "cliente") {
+        sessionStorage.setItem("petcare_user", JSON.stringify(j.user));
+        sessionStorage.setItem("petcare_session_exp", String(Date.now() + 8*60*60*1000));
+        window.location.reload();
+      } else if (j?.user) { window.location.href = "/dashboard"; }
+      else { window.location.href = "/"; }
+    }).catch(() => { window.location.href = "/"; });
   }, []);
 
+  // ── Confirmar cita desde link del email (?confirmar=N) ────────────────────
+  useEffect(() => {
+    if (!confirmandoCitaId) return;
+    // Ir automáticamente a la tab de citas
+    handleTabChange("citas");
+    // Intentar confirmar
+    fetch(`/api/citas/${confirmandoCitaId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ estado: "confirmada" }),
+    }).then(r => r.json()).then(j => {
+      if (j.data) {
+        // Limpiar el query param sin recargar
+        const url = new URL(window.location.href);
+        url.searchParams.delete("confirmar");
+        window.history.replaceState({}, "", url.toString());
+        setConfirmandoCitaId(null);
+      }
+    }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [confirmandoCitaId]);
+
+  // ── Summary data (alertas, seguimientos, atenciones) ──────────────────────
+  useEffect(() => {
+    Promise.all([
+      fetch("/api/alertas-vacunacion?estado=activa").then(r=>r.json()).catch(()=>({})),
+      fetch("/api/seguimientos-clinicos?pendientes=1").then(r=>r.json()).catch(()=>({})),
+      fetch("/api/atenciones-clinicas").then(r=>r.json()).catch(()=>({})),
+      fetch("/api/portal/cola-espera").then(r=>r.json()).catch(()=>({})),
+    ]).then(([jA, jS, jAt, jC]) => {
+      setAlertasVac(jA.data ?? []);
+      setSeguimientos((jS.data ?? []).filter((s: SeguimientoPortal) => ["pendiente","sugerencia_enviada"].includes(s.estado)));
+      setAtencionesActivas((jAt.data ?? []).filter((a: AtencionPortal) => !["finalizado","cancelada","no_asistio"].includes(a.estado_actual)));
+      setColaEsperaActiva(jC.data ?? []);
+    });
+  }, []);
+
+  // ── Tab data loader — no setState síncrono: solo llama setState en async callbacks ──
   const loadTab = useCallback(async (t: Tab) => {
-    setLoadingTab(true);
     try {
       if (t === "mascotas") {
-        const r = await fetch("/api/mascotas"); const j = await r.json(); setMascotas(j.data ?? []);
+        const j = await fetch("/api/mascotas").then(r=>r.json());
+        setMascotas(j.data ?? []);
       } else if (t === "citas") {
-        const r = await fetch("/api/citas"); const j = await r.json(); setCitas(j.data ?? []);
+        const j = await fetch("/api/citas").then(r=>r.json());
+        setCitas(j.data ?? []);
+      } else if (t === "seguimientos") {
+        const j = await fetch("/api/seguimientos-clinicos?pendientes=1").then(r=>r.json());
+        setSeguimientos((j.data ?? []).filter((s: SeguimientoPortal) => ["pendiente","sugerencia_enviada"].includes(s.estado)));
       } else {
-        // El selector y el PDF necesitan también la lista de mascotas del cliente.
         const [hRes, mRes] = await Promise.all([
-          fetch("/api/historia-clinica").then((r) => r.json()).catch(() => ({})),
-          fetch("/api/mascotas").then((r) => r.json()).catch(() => ({})),
+          fetch("/api/historia-clinica").then(r=>r.json()).catch(()=>({})),
+          fetch("/api/mascotas").then(r=>r.json()).catch(()=>({})),
         ]);
         setHistorias(hRes.data ?? []);
         setMascotas(mRes.data ?? []);
       }
-    } finally { setLoadingTab(false); }
+    } finally {
+      setLoadingTab(false); // solo en callback async — válido
+    }
   }, []);
 
+  // Efecto de tab: loadTab ya no llama setState síncronamente, este patrón es seguro
   useEffect(() => { loadTab(tab); }, [tab, loadTab]);
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  const handleTabChange = (t: Tab) => {
+    setLoadingTab(true); // evento de usuario — setState síncrono válido aquí
+    setTab(t);
+  };
+
+  const openBooking = (opts: { motivo?: string; mascotaId?: number } = {}) => {
+    if (mascotas.length === 0) { setNoMascotasAlert(true); return; }
+    setBookingPrefill(opts);
+    setBookingOpen(true);
+  };
 
   const firstName = user?.nombre ?? "Cliente";
 
-  const tabBtn = (id: Tab, label: string, icon: React.ReactNode) => (
-    <button onClick={() => setTab(id)} style={{
-      display:"flex", alignItems:"center", gap:"8px", padding:"10px 20px",
-      borderRadius:"10px", border:"none", cursor:"pointer", fontFamily:"var(--font-dm-sans)",
-      fontSize:"0.88rem", fontWeight: tab===id ? 700 : 500, transition:"all 0.15s",
+  const tabBtn = (id: Tab, label: string, icon: React.ReactNode, badge?: number) => (
+    <button onClick={() => handleTabChange(id)} style={{
+      display:"flex", alignItems:"center", gap:"8px", padding:"10px 18px",
+      borderRadius:"10px", border:"none", cursor:"pointer",
+      fontFamily:"var(--font-dm-sans)", fontSize:"0.85rem",
+      fontWeight: tab===id ? 700 : 500, transition:"all 0.15s",
       background: tab===id ? "#0a1a11" : "transparent",
-      color: tab===id ? "#fff" : "#6b5c44",
+      color: tab===id ? "#fff" : "#6b5c44", position:"relative",
     }}>
       {icon} {label}
+      {badge != null && badge > 0 && (
+        <span style={{ position:"absolute", top:"4px", right:"4px", width:"16px", height:"16px", borderRadius:"50%", background:"#dc2626", color:"#fff", fontSize:"0.6rem", fontWeight:700, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"var(--font-dm-sans)" }}>
+          {badge > 9 ? "9+" : badge}
+        </span>
+      )}
     </button>
   );
 
+  // ── Historial helpers ──────────────────────────────────────────────────────
+  const historiasFiltradas = historialMascotaId === "all"
+    ? historias
+    : historias.filter(h => h.id_mascota === historialMascotaId);
+
+  const handleDescargarPdf = async () => {
+    const mascotaSeleccionada = historialMascotaId === "all"
+      ? null
+      : mascotas.find(m => m.id_mascota === historialMascotaId) ?? null;
+    const mascotasParaPdf = mascotaSeleccionada
+      ? [mascotaSeleccionada]
+      : mascotas.filter(m => historias.some(h => h.id_mascota === m.id_mascota));
+    for (const mPdf of mascotasParaPdf) {
+      await exportHistorialPdf({
+        mascota: { id_mascota:mPdf.id_mascota, nombre:mPdf.nombre, especie:mPdf.especie, raza:mPdf.raza, sexo:mPdf.sexo, color:mPdf.color, fecha_nacimiento:mPdf.fecha_nacimiento, clientes: user ? { usuarios:{ nombre:user.nombre, apellido:user.apellido } } : undefined },
+        historias: historias.filter(h => h.id_mascota === mPdf.id_mascota),
+      });
+    }
+  };
+
+  // ──────────────────────────────────────────────────────────────────────────
   return (
     <div style={{ minHeight:"100vh", background:"#ede7d9" }}>
-      {/* TOP NAV */}
-      <header style={{ background:"linear-gradient(135deg,#0a1a11,#0f2318)", padding:"0 clamp(20px,4vw,60px)",
-        height:"64px", display:"flex", alignItems:"center", justifyContent:"space-between",
-        position:"sticky", top:0, zIndex:50 }}>
+
+      {/* ── HEADER ── */}
+      <header style={{ background:"linear-gradient(135deg,#0a1a11,#0f2318)", padding:"0 clamp(20px,4vw,60px)", height:"64px", display:"flex", alignItems:"center", justifyContent:"space-between", position:"sticky", top:0, zIndex:50 }}>
         <div style={{ display:"flex", alignItems:"center", gap:"16px" }}>
           <Link href="/" style={{ display:"flex", alignItems:"center" }}>
-            <Image src="/logo/logo_h.png" alt="PetCare" width={100} height={28}
-              style={{ height:"auto", filter:"brightness(0) invert(1)", opacity:0.9 }} />
+            <Image src="/logo/logo_h.png" alt="PetCare" width={100} height={28} style={{ height:"auto", filter:"brightness(0) invert(1)", opacity:0.9 }} />
           </Link>
           <div style={{ width:"1px", height:"20px", background:"rgba(255,255,255,0.15)" }} />
-          <span style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.82rem", color:"rgba(255,255,255,0.55)" }}>
-            Mi Portal
-          </span>
+          <span style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.82rem", color:"rgba(255,255,255,0.55)" }}>Mi Portal</span>
         </div>
         <div style={{ display:"flex", alignItems:"center", gap:"12px" }}>
           <button onClick={() => setProfileOpen(true)} title="Mi perfil"
-            style={{ display:"flex", alignItems:"center", gap:"8px", background:"transparent",
-              border:"1px solid rgba(255,255,255,0.1)", padding:"4px 10px 4px 4px", borderRadius:"99px",
-              cursor:"pointer", transition:"all 0.15s" }}
-            onMouseEnter={e=>{ (e.currentTarget as HTMLButtonElement).style.background="rgba(255,255,255,0.08)"; }}
-            onMouseLeave={e=>{ (e.currentTarget as HTMLButtonElement).style.background="transparent"; }}
-          >
-            <div style={{ width:"32px", height:"32px", borderRadius:"50%", background:"rgba(61,132,91,0.25)",
-              border:"1.5px solid rgba(61,132,91,0.4)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+            style={{ display:"flex", alignItems:"center", gap:"8px", background:"transparent", border:"1px solid rgba(255,255,255,0.1)", padding:"4px 10px 4px 4px", borderRadius:"99px", cursor:"pointer", transition:"all 0.15s" }}
+            onMouseEnter={e=>{(e.currentTarget as HTMLButtonElement).style.background="rgba(255,255,255,0.08)";}}
+            onMouseLeave={e=>{(e.currentTarget as HTMLButtonElement).style.background="transparent";}}>
+            <div style={{ width:"32px", height:"32px", borderRadius:"50%", background:"rgba(61,132,91,0.25)", border:"1.5px solid rgba(61,132,91,0.4)", display:"flex", alignItems:"center", justifyContent:"center" }}>
               <User size={14} color="#80cc9c" />
             </div>
-            <span className="hidden sm:block" style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.82rem",
-              color:"rgba(255,255,255,0.75)", fontWeight:500 }}>
+            <span className="hidden sm:block" style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.82rem", color:"rgba(255,255,255,0.75)", fontWeight:500 }}>
               {user?.nombre} {user?.apellido}
             </span>
           </button>
-          <Link href="/" style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.78rem",
-            color:"rgba(255,255,255,0.45)", textDecoration:"none", padding:"6px 10px",
-            borderRadius:"7px", border:"1px solid rgba(255,255,255,0.1)", transition:"all 0.15s" }}
-            onMouseEnter={e=>{ (e.currentTarget as HTMLAnchorElement).style.color="rgba(255,255,255,0.8)"; }}
-            onMouseLeave={e=>{ (e.currentTarget as HTMLAnchorElement).style.color="rgba(255,255,255,0.45)"; }}
-          >
+          <Link href="/" style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.78rem", color:"rgba(255,255,255,0.45)", textDecoration:"none", padding:"6px 10px", borderRadius:"7px", border:"1px solid rgba(255,255,255,0.1)", transition:"all 0.15s" }}
+            onMouseEnter={e=>{(e.currentTarget as HTMLAnchorElement).style.color="rgba(255,255,255,0.8)";}}
+            onMouseLeave={e=>{(e.currentTarget as HTMLAnchorElement).style.color="rgba(255,255,255,0.45)";}}>
             Inicio
           </Link>
-          <button onClick={() => setShowLogout(true)} title="Cerrar sesión"
-            style={{ background:"rgba(255,255,255,0.08)", border:"1px solid rgba(255,255,255,0.15)",
-              color:"rgba(255,255,255,0.7)", cursor:"pointer", padding:"6px 12px", borderRadius:"7px",
-              fontFamily:"var(--font-dm-sans)", fontSize:"0.78rem", display:"flex", alignItems:"center", gap:"6px",
-              transition:"all 0.15s" }}
-            onMouseEnter={e=>{ const b=e.currentTarget as HTMLButtonElement; b.style.background="rgba(255,255,255,0.14)"; b.style.color="#fff"; }}
-            onMouseLeave={e=>{ const b=e.currentTarget as HTMLButtonElement; b.style.background="rgba(255,255,255,0.08)"; b.style.color="rgba(255,255,255,0.7)"; }}
-          >
+          <button onClick={() => setShowLogoutModal(true)} title="Cerrar sesión"
+            style={{ background:"rgba(255,255,255,0.08)", border:"1px solid rgba(255,255,255,0.15)", color:"rgba(255,255,255,0.7)", cursor:"pointer", padding:"6px 12px", borderRadius:"7px", fontFamily:"var(--font-dm-sans)", fontSize:"0.78rem", display:"flex", alignItems:"center", gap:"6px", transition:"all 0.15s" }}
+            onMouseEnter={e=>{const b=e.currentTarget as HTMLButtonElement;b.style.background="rgba(255,255,255,0.14)";b.style.color="#fff";}}
+            onMouseLeave={e=>{const b=e.currentTarget as HTMLButtonElement;b.style.background="rgba(255,255,255,0.08)";b.style.color="rgba(255,255,255,0.7)";}}>
             <LogOut size={13} /> Cerrar sesión
           </button>
         </div>
       </header>
 
-      {/* MAIN */}
-      <main style={{ maxWidth:"960px", margin:"0 auto", padding:"24px clamp(12px,3vw,32px)" }}>
-        {/* ── Contenedor único crema ── */}
-        <div style={{ background:"#faf8f3", border:"1px solid #e0d8ca",
-          borderRadius:"20px", padding:"24px",
-          boxShadow:"0 2px 12px rgba(26,18,8,0.07)" }}>
+      {/* ── MAIN — layout dos columnas ── */}
+      <main style={{ maxWidth:"1200px", margin:"0 auto", padding:"24px clamp(12px,3vw,32px)" }}>
+        <div style={{ display:"flex", gap:20, alignItems:"flex-start" }}>
 
-        {/* ── Banner: correo verificado ── */}
-        {verifiedBanner && (
-          <div style={{ display:"flex", alignItems:"center", gap:"12px", marginBottom:"20px",
-            background:"#f0fdf4", border:"1px solid #86efac", borderRadius:"14px", padding:"14px 18px" }}>
-            <div style={{ width:"36px", height:"36px", borderRadius:"10px", background:"#dcfce7",
-              display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-              <CheckCircle size={20} color="#16a34a" />
-            </div>
-            <div style={{ flex:1 }}>
-              <p style={{ fontFamily:"var(--font-dm-sans)", fontWeight:700, color:"#166534", margin:0, fontSize:"0.92rem" }}>
-                ¡Correo verificado!
-              </p>
-              <p style={{ fontFamily:"var(--font-dm-sans)", color:"#15803d", margin:0, fontSize:"0.82rem" }}>
-                Tu cuenta quedó activada y ya iniciaste sesión. Bienvenido a tu portal.
-              </p>
-            </div>
-            <button onClick={() => setVerifiedBanner(false)}
-              style={{ background:"transparent", border:"none", cursor:"pointer", color:"#16a34a", padding:"4px",
-                display:"flex", alignItems:"center" }}>
-              <X size={16} />
-            </button>
-          </div>
-        )}
+          {/* Columna principal */}
+          <div style={{ flex:1, minWidth:0, background:"#faf8f3", border:"1px solid #e0d8ca", borderRadius:"20px", padding:"24px", boxShadow:"0 2px 12px rgba(26,18,8,0.07)" }}>
 
-        {/* ── Hero card ── */}
-        <div style={{ background:"linear-gradient(135deg,#0a1a11 0%,#133320 100%)",
-          borderRadius:"20px", padding:"28px 32px", marginBottom:"24px",
-          display:"flex", alignItems:"center", justifyContent:"space-between",
-          flexWrap:"wrap", gap:"20px", boxShadow:"0 8px 32px rgba(10,26,17,0.18)" }}>
-          {/* Avatar + greeting */}
-          <div style={{ display:"flex", alignItems:"center", gap:"18px" }}>
-            <div style={{ width:"56px", height:"56px", borderRadius:"50%", flexShrink:0,
-              background:"rgba(196,140,52,0.18)", border:"2px solid rgba(196,140,52,0.4)",
-              display:"flex", alignItems:"center", justifyContent:"center" }}>
-              <PawPrint size={26} color="#c48c34" />
-            </div>
-            <div>
-              <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.72rem", fontWeight:600,
-                letterSpacing:"0.14em", textTransform:"uppercase", color:"rgba(255,255,255,0.4)",
-                margin:"0 0 4px" }}>Mi portal</p>
-              <h1 style={{ fontFamily:"var(--font-fraunces)", fontSize:"clamp(1.4rem,3vw,1.9rem)",
-                fontWeight:700, fontStyle:"italic", color:"#f2e8d5", margin:0, letterSpacing:"-0.02em" }}>
-                Hola, {firstName}
-              </h1>
-            </div>
-          </div>
-          {/* Action buttons */}
-          <div style={{ display:"flex", gap:"10px", flexWrap:"wrap" }}>
-            <button onClick={() => {
-              if (mascotas.length === 0) { setNoMascotasAlert(true); return; }
-              setBookingOpen(true);
-            }}
-              style={{ display:"flex", alignItems:"center", gap:"8px",
-                background:"linear-gradient(135deg,#c48c34,#a07028)", color:"#fff",
-                border:"none", cursor:"pointer", padding:"11px 20px", borderRadius:"10px",
-                fontFamily:"var(--font-dm-sans)", fontSize:"0.85rem", fontWeight:700,
-                boxShadow:"0 4px 16px rgba(196,140,52,0.35)", transition:"all 0.2s", whiteSpace:"nowrap" }}
-              onMouseEnter={e=>{ const b=e.currentTarget as HTMLButtonElement; b.style.transform="translateY(-2px)"; b.style.boxShadow="0 8px 24px rgba(196,140,52,0.5)"; }}
-              onMouseLeave={e=>{ const b=e.currentTarget as HTMLButtonElement; b.style.transform="translateY(0)"; b.style.boxShadow="0 4px 16px rgba(196,140,52,0.35)"; }}
-            >
-              <CalendarPlus size={15} /> Agendar cita
-            </button>
-            <button onClick={() => setMascotaModalOpen(true)}
-              style={{ display:"flex", alignItems:"center", gap:"8px",
-                background:"rgba(61,132,91,0.18)", color:"#80cc9c",
-                border:"1.5px solid rgba(61,132,91,0.35)", cursor:"pointer",
-                padding:"11px 20px", borderRadius:"10px",
-                fontFamily:"var(--font-dm-sans)", fontSize:"0.85rem", fontWeight:700,
-                transition:"all 0.2s", whiteSpace:"nowrap" }}
-              onMouseEnter={e=>{ const b=e.currentTarget as HTMLButtonElement; b.style.background="rgba(61,132,91,0.28)"; b.style.transform="translateY(-2px)"; }}
-              onMouseLeave={e=>{ const b=e.currentTarget as HTMLButtonElement; b.style.background="rgba(61,132,91,0.18)"; b.style.transform="translateY(0)"; }}
-            >
-              <Plus size={15} /> Registrar mascota
-            </button>
-          </div>
-        </div>
-
-        {/* ── TABS ── */}
-        <div style={{ display:"flex", gap:"2px", background:"#ede7d9", padding:"4px",
-          borderRadius:"12px", width:"fit-content", marginBottom:"24px" }}>
-          {tabBtn("mascotas", "Mis mascotas", <PawPrint size={14} />)}
-          {tabBtn("citas", "Mis citas", <CalendarDays size={14} />)}
-          {tabBtn("historial", "Historial clínico", <FileText size={14} />)}
-        </div>
-
-        {/* TAB CONTENT — tarjeta contenedora */}
-        <div style={{ background:"#fff", border:"1px solid #e8e0d0", borderRadius:"16px",
-          padding:"24px", minHeight:"320px" }}>
-        {loadingTab ? (
-          <div style={{ display:"flex", justifyContent:"center", padding:"60px 0" }}>
-            <Image src="/logo/logo_i.png" alt="" width={48} height={48}
-              style={{ animation:"pulse 1.5s ease-in-out infinite", objectFit:"contain" }} />
-          </div>
-        ) : (
-          <>
-            {tab === "mascotas" && (
-              <div>
-                {mascotas.length === 0 ? (
-                  <div style={{ textAlign:"center", padding:"60px 20px" }}>
-                    <PawPrint size={40} color="#d9cfba" style={{ margin:"0 auto 12px", display:"block" }} />
-                    <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.9rem", color:"#8a7a60",
-                      margin:"0 0 20px" }}>
-                      No tienes mascotas registradas aún.
-                    </p>
-                    <button onClick={() => setMascotaModalOpen(true)}
-                      style={{ display:"inline-flex", alignItems:"center", gap:"8px",
-                        background:"linear-gradient(135deg,#3d845b,#2d6647)", color:"#fff",
-                        border:"none", cursor:"pointer", padding:"11px 22px", borderRadius:"10px",
-                        fontFamily:"var(--font-dm-sans)", fontSize:"0.88rem", fontWeight:700 }}>
-                      <Plus size={15} /> Registrar mi primera mascota
-                    </button>
-                  </div>
-                ) : (
-                  <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))", gap:"20px" }}>
-                    {mascotas.map(m => <MascotaCard key={m.id_mascota} m={m} onEdit={setEditMascota} />)}
-                  </div>
-                )}
+          {/* Verified banner */}
+          {verifiedBanner && (
+            <div style={{ display:"flex", alignItems:"center", gap:"12px", marginBottom:"20px", background:"#f0fdf4", border:"1px solid #86efac", borderRadius:"14px", padding:"14px 18px" }}>
+              <div style={{ width:"36px", height:"36px", borderRadius:"10px", background:"#dcfce7", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                <span style={{ fontSize:"1.2rem" }}>✓</span>
               </div>
-            )}
+              <div style={{ flex:1 }}>
+                <p style={{ fontFamily:"var(--font-dm-sans)", fontWeight:700, color:"#166534", margin:0, fontSize:"0.92rem" }}>¡Correo verificado!</p>
+                <p style={{ fontFamily:"var(--font-dm-sans)", color:"#15803d", margin:0, fontSize:"0.82rem" }}>Tu cuenta quedó activada. Bienvenido a tu portal.</p>
+              </div>
+              <button onClick={() => setVerifiedBanner(false)} style={{ background:"transparent", border:"none", cursor:"pointer", color:"#16a34a", padding:"4px", display:"flex" }}><X size={16} /></button>
+            </div>
+          )}
 
-            {tab === "citas" && (
-              <div style={{ display:"flex", flexDirection:"column", gap:"10px" }}>
-                {citas.length === 0 ? (
-                  <div style={{ textAlign:"center", padding:"60px 20px", color:"#8a7a60",
-                    fontFamily:"var(--font-dm-sans)", fontSize:"0.9rem" }}>
-                    <CalendarDays size={40} color="#d9cfba" style={{ margin:"0 auto 12px", display:"block" }} />
-                    No tienes citas registradas.
-                  </div>
-                ) : citas.map(c => (
-                  <div key={c.id_cita} style={{ background:"#fff", border:"1px solid #e8e0d0", borderRadius:"14px",
-                    padding:"18px 22px", display:"flex", alignItems:"center", justifyContent:"space-between",
-                    gap:"16px", flexWrap:"wrap" }}>
-                    <div style={{ display:"flex", alignItems:"center", gap:"16px", minWidth:0 }}>
-                      <div style={{ width:"46px", height:"46px", borderRadius:"12px",
-                        background:"linear-gradient(135deg,#fdf3dc,#fce8b0)", display:"flex",
-                        alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                        <CalendarDays size={20} color="#c48c34" />
-                      </div>
-                      <div style={{ minWidth:0 }}>
-                        <p style={{ fontFamily:"var(--font-dm-sans)", fontWeight:600, color:"#1a1208",
-                          margin:0, fontSize:"0.9rem" }}>
-                          {c.mascotas?.nombre ?? "—"} · {c.motivo}
-                        </p>
-                        <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.78rem", color:"#8a7a60", margin:0 }}>
-                          {formatLima(`${c.fecha}T00:00:00`, "dd/MM/yyyy")} a las {format12h(c.hora)}
-                          {c.veterinarios ? ` · Dr. ${c.veterinarios.usuarios.nombre} ${c.veterinarios.usuarios.apellido}` : ""}
-                        </p>
-                      </div>
-                    </div>
-                    <div style={{ display:"flex", alignItems:"center", gap:"8px", flexShrink:0, flexWrap:"wrap", justifyContent:"flex-end" }}>
-                      <Badge variant={c.estado}>{estadoLabels[c.estado]}</Badge>
-                      {(c.estado === "pendiente" || c.estado === "confirmada") && (
-                        <button onClick={() => setRescheduleItem(c)}
-                          style={{ background:"#fdf3dc", border:"1px solid #f0d080",
-                            color:"#a07028", cursor:"pointer", padding:"6px 10px", borderRadius:"8px",
-                            fontFamily:"var(--font-dm-sans)", fontSize:"0.75rem", fontWeight:600,
-                            display:"flex", alignItems:"center", gap:"4px" }}>
-                          <CalendarClock size={12} /> Reprogramar
-                        </button>
-                      )}
-                      <button onClick={() => setDetailCita(c)} style={{ background:"#f0fdf4", border:"1px solid #86efac",
-                        color:"#16a34a", cursor:"pointer", padding:"6px 10px", borderRadius:"8px",
-                        fontFamily:"var(--font-dm-sans)", fontSize:"0.75rem", fontWeight:600,
-                        display:"flex", alignItems:"center", gap:"4px" }}>
-                        Ver <ChevronRight size={12} />
+          {/* Hero */}
+          <div style={{ background:"linear-gradient(135deg,#0a1a11 0%,#133320 100%)", borderRadius:"20px", padding:"28px 32px", marginBottom:"24px", display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:"20px", boxShadow:"0 8px 32px rgba(10,26,17,0.18)" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:"18px" }}>
+              <div style={{ width:"56px", height:"56px", borderRadius:"50%", flexShrink:0, background:"rgba(196,140,52,0.18)", border:"2px solid rgba(196,140,52,0.4)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                <PawPrint size={26} color="#c48c34" />
+              </div>
+              <div>
+                <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.72rem", fontWeight:600, letterSpacing:"0.14em", textTransform:"uppercase", color:"rgba(255,255,255,0.4)", margin:"0 0 4px" }}>Mi portal</p>
+                <h1 style={{ fontFamily:"var(--font-fraunces)", fontSize:"clamp(1.4rem,3vw,1.9rem)", fontWeight:700, fontStyle:"italic", color:"#f2e8d5", margin:0, letterSpacing:"-0.02em" }}>Hola, {firstName}</h1>
+              </div>
+            </div>
+            <div style={{ display:"flex", gap:"10px", flexWrap:"wrap" }}>
+              <button onClick={() => openBooking()}
+                style={{ display:"flex", alignItems:"center", gap:"8px", background:"linear-gradient(135deg,#c48c34,#a07028)", color:"#fff", border:"none", cursor:"pointer", padding:"11px 20px", borderRadius:"10px", fontFamily:"var(--font-dm-sans)", fontSize:"0.85rem", fontWeight:700, boxShadow:"0 4px 16px rgba(196,140,52,0.35)", transition:"all 0.2s", whiteSpace:"nowrap" }}
+                onMouseEnter={e=>{const b=e.currentTarget as HTMLButtonElement;b.style.transform="translateY(-2px)";b.style.boxShadow="0 8px 24px rgba(196,140,52,0.5)";}}
+                onMouseLeave={e=>{const b=e.currentTarget as HTMLButtonElement;b.style.transform="translateY(0)";b.style.boxShadow="0 4px 16px rgba(196,140,52,0.35)";}}>
+                <CalendarPlus size={15} /> Agendar cita
+              </button>
+              <button onClick={() => setMascotaModalOpen(true)}
+                style={{ display:"flex", alignItems:"center", gap:"8px", background:"rgba(61,132,91,0.18)", color:"#80cc9c", border:"1.5px solid rgba(61,132,91,0.35)", cursor:"pointer", padding:"11px 20px", borderRadius:"10px", fontFamily:"var(--font-dm-sans)", fontSize:"0.85rem", fontWeight:700, transition:"all 0.2s", whiteSpace:"nowrap" }}
+                onMouseEnter={e=>{const b=e.currentTarget as HTMLButtonElement;b.style.background="rgba(61,132,91,0.28)";b.style.transform="translateY(-2px)";}}
+                onMouseLeave={e=>{const b=e.currentTarget as HTMLButtonElement;b.style.background="rgba(61,132,91,0.18)";b.style.transform="translateY(0)";}}>
+                <Plus size={15} /> Registrar mascota
+              </button>
+            </div>
+          </div>
+
+          {/* Tabs */}
+          <div style={{ display:"flex", flexWrap:"wrap", gap:"2px", background:"#ede7d9", padding:"4px", borderRadius:"12px", width:"fit-content", marginBottom:"24px" }}>
+            {tabBtn("mascotas",    "Mis mascotas",   <PawPrint size={14} />)}
+            {tabBtn("citas",       "Mis citas",      <CalendarDays size={14} />)}
+            {tabBtn("historial",   "Historial clínico", <FileText size={14} />)}
+            {tabBtn("seguimientos","Seguimientos",   <Clock size={14} />, seguimientos.length)}
+          </div>
+
+          {/* Tab content */}
+          <div style={{ background:"#fff", border:"1px solid #e8e0d0", borderRadius:"16px", padding:"24px", minHeight:"320px" }}>
+            {loadingTab ? (
+              <div style={{ display:"flex", justifyContent:"center", padding:"60px 0" }}>
+                <Image src="/logo/logo_i.png" alt="" width={48} height={48} style={{ animation:"pulse 1.5s ease-in-out infinite", objectFit:"contain" }} />
+              </div>
+            ) : (
+              <>
+                {/* ── MASCOTAS ── */}
+                {tab === "mascotas" && (
+                  mascotas.length === 0 ? (
+                    <div style={{ textAlign:"center", padding:"60px 20px" }}>
+                      <PawPrint size={40} color="#d9cfba" style={{ margin:"0 auto 12px", display:"block" }} />
+                      <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.9rem", color:"#8a7a60", margin:"0 0 20px" }}>No tienes mascotas registradas aún.</p>
+                      <button onClick={() => setMascotaModalOpen(true)} style={{ display:"inline-flex", alignItems:"center", gap:"8px", background:"linear-gradient(135deg,#3d845b,#2d6647)", color:"#fff", border:"none", cursor:"pointer", padding:"11px 22px", borderRadius:"10px", fontFamily:"var(--font-dm-sans)", fontSize:"0.88rem", fontWeight:700 }}>
+                        <Plus size={15} /> Registrar mi primera mascota
                       </button>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {tab === "historial" && (() => {
-              const historiasFiltradas = historialMascotaId === "all"
-                ? historias
-                : historias.filter((h) => h.id_mascota === historialMascotaId);
-              const mascotaSeleccionada = historialMascotaId === "all"
-                ? null
-                : mascotas.find((m) => m.id_mascota === historialMascotaId) ?? null;
-              const handleDescargar = async () => {
-                const mascotasParaPdf = mascotaSeleccionada
-                  ? [mascotaSeleccionada]
-                  : mascotas.filter((m) => historias.some((h) => h.id_mascota === m.id_mascota));
-                for (const mPdf of mascotasParaPdf) {
-                  await exportHistorialPdf({
-                    mascota: {
-                      id_mascota: mPdf.id_mascota,
-                      nombre: mPdf.nombre,
-                      especie: mPdf.especie,
-                      raza: mPdf.raza,
-                      sexo: mPdf.sexo,
-                      color: mPdf.color,
-                      fecha_nacimiento: mPdf.fecha_nacimiento,
-                      clientes: user ? { usuarios: { nombre: user.nombre, apellido: user.apellido } } : undefined,
-                    },
-                    historias: historias.filter((h) => h.id_mascota === mPdf.id_mascota),
-                  });
-                }
-              };
-              return (
-              <div style={{ display:"flex", flexDirection:"column", gap:"14px" }}>
-                {mascotas.length > 1 && (
-                  <div style={{ display:"flex", flexWrap:"wrap", gap:"12px", alignItems:"center", justifyContent:"space-between" }}>
-                    <label style={{ display:"flex", alignItems:"center", gap:"10px", flex:"1 1 220px" }}>
-                      <span style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.78rem", fontWeight:700,
-                        textTransform:"uppercase", letterSpacing:"0.07em", color:"#6b5c44", whiteSpace:"nowrap" }}>
-                        Mascota
-                      </span>
-                      <select
-                        value={String(historialMascotaId)}
-                        onChange={(e) => setHistorialMascotaId(e.target.value === "all" ? "all" : Number(e.target.value))}
-                        style={{ flex:1, height:"38px", borderRadius:"9px", border:"1.5px solid #d0c8b8",
-                          background:"#fdfaf5", padding:"0 12px", fontSize:"0.85rem",
-                          fontFamily:"var(--font-dm-sans)", color:"#1a1208", outline:"none" }}>
-                        <option value="all">Todas mis mascotas</option>
-                        {mascotas.map((m) => (
-                          <option key={m.id_mascota} value={m.id_mascota}>{m.nombre} ({m.especie})</option>
-                        ))}
-                      </select>
-                    </label>
-                    <button
-                      onClick={handleDescargar}
-                      disabled={historiasFiltradas.length === 0}
-                      style={{ display:"flex", alignItems:"center", gap:"6px",
-                        background:"#2d6a4f", color:"#fff", border:"none",
-                        cursor: historiasFiltradas.length === 0 ? "not-allowed" : "pointer",
-                        padding:"10px 16px", borderRadius:"9px",
-                        fontFamily:"var(--font-dm-sans)", fontSize:"0.85rem", fontWeight:700,
-                        opacity: historiasFiltradas.length === 0 ? 0.5 : 1 }}>
-                      <FileText size={14} /> Descargar PDF
-                    </button>
-                  </div>
-                )}
-                {mascotas.length === 1 && historias.length > 0 && (
-                  <div style={{ display:"flex", justifyContent:"flex-end" }}>
-                    <button
-                      onClick={handleDescargar}
-                      style={{ display:"flex", alignItems:"center", gap:"6px",
-                        background:"#2d6a4f", color:"#fff", border:"none", cursor:"pointer",
-                        padding:"10px 16px", borderRadius:"9px",
-                        fontFamily:"var(--font-dm-sans)", fontSize:"0.85rem", fontWeight:700 }}>
-                      <FileText size={14} /> Descargar PDF
-                    </button>
-                  </div>
-                )}
-                {historiasFiltradas.length === 0 ? (
-                  <div style={{ textAlign:"center", padding:"60px 20px", color:"#8a7a60",
-                    fontFamily:"var(--font-dm-sans)", fontSize:"0.9rem" }}>
-                    <FileText size={40} color="#d9cfba" style={{ margin:"0 auto 12px", display:"block" }} />
-                    {historias.length === 0
-                      ? "No hay historias clínicas registradas."
-                      : "No hay historias para la mascota seleccionada."}
-                  </div>
-                ) : historiasFiltradas.map(h => (
-                  <div key={h.id_historia} style={{ background:"#fff", border:"1px solid #e8e0d0",
-                    borderRadius:"14px", padding:"20px 24px" }}>
-                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start",
-                      gap:"12px", marginBottom:"14px" }}>
-                      <div>
-                        <p style={{ fontFamily:"var(--font-fraunces)", fontSize:"1rem", fontWeight:700,
-                          color:"#1a1208", margin:0 }}>{h.mascotas?.nombre ?? "—"}</p>
-                        <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.78rem", color:"#8a7a60", margin:0 }}>
-                          {formatLima(`${h.fecha_consulta}T00:00:00`, "dd/MM/yyyy")}
-                          {h.veterinarios ? ` · Dr. ${h.veterinarios.usuarios.nombre} ${h.veterinarios.usuarios.apellido}` : ""}
-                        </p>
-                      </div>
-                      {h.peso_consulta && (
-                        <span style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.78rem", fontWeight:600,
-                          color:"#3d845b", background:"#f0fdf4", padding:"4px 10px", borderRadius:"99px",
-                          whiteSpace:"nowrap" }}>{h.peso_consulta} kg</span>
-                      )}
-                    </div>
-                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px" }}>
-                      {[["Diagnóstico", h.diagnostico], ["Tratamiento", h.tratamiento]].map(([l,v])=>(
-                        <div key={l}>
-                          <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.7rem", fontWeight:700,
-                            textTransform:"uppercase", letterSpacing:"0.08em", color:"#8a7a60", margin:"0 0 3px" }}>{l}</p>
-                          <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.85rem", color:"#1a1208",
-                            margin:0, lineHeight:1.5 }}>{v}</p>
-                        </div>
+                  ) : (
+                    <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))", gap:"20px" }}>
+                      {mascotas.map(m => (
+                        <MascotaCard key={m.id_mascota} m={m} onEdit={setEditMascota} atencionActiva={atencionesActivas.find(a => a.id_mascota === m.id_mascota)} />
                       ))}
-                      {h.observaciones && (
-                        <div style={{ gridColumn:"1/-1" }}>
-                          <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.7rem", fontWeight:700,
-                            textTransform:"uppercase", letterSpacing:"0.08em", color:"#8a7a60", margin:"0 0 3px" }}>Observaciones</p>
-                          <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.85rem", color:"#1a1208", margin:0, lineHeight:1.5 }}>{h.observaciones}</p>
-                        </div>
-                      )}
                     </div>
+                  )
+                )}
+
+                {/* ── CITAS ── */}
+                {tab === "citas" && (
+                  <div style={{ display:"flex", flexDirection:"column", gap:"10px" }}>
+                    {citas.length === 0 ? (
+                      <div style={{ textAlign:"center", padding:"60px 20px", color:"#8a7a60", fontFamily:"var(--font-dm-sans)", fontSize:"0.9rem" }}>
+                        <CalendarDays size={40} color="#d9cfba" style={{ margin:"0 auto 12px", display:"block" }} />
+                        No tienes citas registradas.
+                        <div style={{ marginTop:"12px" }}>
+                          <button onClick={() => setColaOpen(true)} style={{ display:"inline-flex", alignItems:"center", gap:"6px", background:"rgba(124,58,237,0.1)", color:"#7c3aed", border:"1px solid rgba(124,58,237,0.3)", cursor:"pointer", padding:"8px 16px", borderRadius:"9px", fontFamily:"var(--font-dm-sans)", fontSize:"0.82rem", fontWeight:600 }}>
+                            <ListOrdered size={13} /> Unirme a lista de espera
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        {citas.map(c => (
+                          <div key={c.id_cita} style={{ background:"#fff", border:"1px solid #e8e0d0", borderRadius:"14px", padding:"18px 22px", display:"flex", alignItems:"center", justifyContent:"space-between", gap:"16px", flexWrap:"wrap" }}>
+                            <div style={{ display:"flex", alignItems:"center", gap:"16px", minWidth:0 }}>
+                              <div style={{ width:"46px", height:"46px", borderRadius:"12px", background:"linear-gradient(135deg,#fdf3dc,#fce8b0)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                                <CalendarDays size={20} color="#c48c34" />
+                              </div>
+                              <div style={{ minWidth:0 }}>
+                                <p style={{ fontFamily:"var(--font-dm-sans)", fontWeight:600, color:"#1a1208", margin:0, fontSize:"0.9rem" }}>
+                                  {c.mascotas?.nombre ?? "—"} · {c.motivo}
+                                </p>
+                                <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.78rem", color:"#8a7a60", margin:0 }}>
+                                  {formatLima(`${c.fecha}T00:00:00`, "dd/MM/yyyy")} a las {format12h(c.hora)}
+                                  {c.veterinarios ? ` · Dr. ${c.veterinarios.usuarios.nombre} ${c.veterinarios.usuarios.apellido}` : ""}
+                                </p>
+                              </div>
+                            </div>
+                            <div style={{ display:"flex", alignItems:"center", gap:"8px", flexShrink:0, flexWrap:"wrap", justifyContent:"flex-end" }}>
+                              <Badge variant={c.estado}>{estadoLabels[c.estado]}</Badge>
+                              {/* Confirmar asistencia — solo citas pendientes */}
+                              {c.estado === "pendiente" && (
+                                <button onClick={async () => {
+                                  const res = await fetch(`/api/citas/${c.id_cita}`, { method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ estado:"confirmada" }) });
+                                  if (res.ok) { setLoadingTab(true); loadTab("citas"); }
+                                }} style={{ background:"#f0fdf4", border:"1px solid #86efac", color:"#15803d", cursor:"pointer", padding:"6px 10px", borderRadius:"8px", fontFamily:"var(--font-dm-sans)", fontSize:"0.75rem", fontWeight:700, display:"flex", alignItems:"center", gap:"4px" }}>
+                                  ✓ Confirmar asistencia
+                                </button>
+                              )}
+                              {(c.estado==="pendiente"||c.estado==="confirmada") && (
+                                <button onClick={() => setRescheduleItem(c)} style={{ background:"#fdf3dc", border:"1px solid #f0d080", color:"#a07028", cursor:"pointer", padding:"6px 10px", borderRadius:"8px", fontFamily:"var(--font-dm-sans)", fontSize:"0.75rem", fontWeight:600, display:"flex", alignItems:"center", gap:"4px" }}>
+                                  <CalendarClock size={12} /> Reprogramar
+                                </button>
+                              )}
+                              <button onClick={() => setDetailCita(c)} style={{ background:"rgba(240,253,244,0.5)", border:"1px solid #e5e7eb", color:"#374151", cursor:"pointer", padding:"6px 10px", borderRadius:"8px", fontFamily:"var(--font-dm-sans)", fontSize:"0.75rem", fontWeight:600, display:"flex", alignItems:"center", gap:"4px" }}>
+                                Ver <ChevronRight size={12} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                        <div style={{ paddingTop:"8px", borderTop:"1px solid #f5f0e8" }}>
+                          <button onClick={() => setColaOpen(true)} style={{ display:"flex", alignItems:"center", gap:"6px", background:"transparent", color:"#8a7a60", border:"1px dashed #d9cfba", cursor:"pointer", padding:"8px 16px", borderRadius:"9px", fontFamily:"var(--font-dm-sans)", fontSize:"0.78rem", fontWeight:600 }}>
+                            <ListOrdered size={13} /> ¿No encuentras horario? Unirme a lista de espera
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
-                ))}
-              </div>
-              );
-            })()}
-          </>
-        )}
-        </div>{/* cierre tab content */}
-        </div>{/* cierre contenedor crema */}
+                )}
+
+                {/* ── HISTORIAL ── */}
+                {tab === "historial" && (
+                  <div style={{ display:"flex", flexDirection:"column", gap:"14px" }}>
+                    {mascotas.length > 1 && (
+                      <div style={{ display:"flex", flexWrap:"wrap", gap:"12px", alignItems:"center", justifyContent:"space-between" }}>
+                        <label style={{ display:"flex", alignItems:"center", gap:"10px", flex:"1 1 220px" }}>
+                          <span style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.78rem", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.07em", color:"#6b5c44", whiteSpace:"nowrap" }}>Mascota</span>
+                          <select value={String(historialMascotaId)} onChange={e=>setHistorialMascotaId(e.target.value==="all"?"all":Number(e.target.value))}
+                            style={{ flex:1, height:"38px", borderRadius:"9px", border:"1.5px solid #d0c8b8", background:"#fdfaf5", padding:"0 12px", fontSize:"0.85rem", fontFamily:"var(--font-dm-sans)", color:"#1a1208", outline:"none" }}>
+                            <option value="all">Todas mis mascotas</option>
+                            {mascotas.map(m => <option key={m.id_mascota} value={m.id_mascota}>{m.nombre} ({m.especie})</option>)}
+                          </select>
+                        </label>
+                        <button onClick={handleDescargarPdf} disabled={historiasFiltradas.length===0}
+                          style={{ display:"flex", alignItems:"center", gap:"6px", background:"#2d6a4f", color:"#fff", border:"none", cursor:historiasFiltradas.length===0?"not-allowed":"pointer", padding:"10px 16px", borderRadius:"9px", fontFamily:"var(--font-dm-sans)", fontSize:"0.85rem", fontWeight:700, opacity:historiasFiltradas.length===0?0.5:1 }}>
+                          <FileText size={14} /> Descargar PDF
+                        </button>
+                      </div>
+                    )}
+                    {mascotas.length === 1 && historias.length > 0 && (
+                      <div style={{ display:"flex", justifyContent:"flex-end" }}>
+                        <button onClick={handleDescargarPdf} style={{ display:"flex", alignItems:"center", gap:"6px", background:"#2d6a4f", color:"#fff", border:"none", cursor:"pointer", padding:"10px 16px", borderRadius:"9px", fontFamily:"var(--font-dm-sans)", fontSize:"0.85rem", fontWeight:700 }}>
+                          <FileText size={14} /> Descargar PDF
+                        </button>
+                      </div>
+                    )}
+                    {historiasFiltradas.length === 0 ? (
+                      <div style={{ textAlign:"center", padding:"60px 20px", color:"#8a7a60", fontFamily:"var(--font-dm-sans)", fontSize:"0.9rem" }}>
+                        <FileText size={40} color="#d9cfba" style={{ margin:"0 auto 12px", display:"block" }} />
+                        {historias.length===0 ? "No hay historias clínicas registradas." : "No hay historias para la mascota seleccionada."}
+                      </div>
+                    ) : historiasFiltradas.map(h => (
+                      <div key={h.id_historia} style={{ background:"#fff", border:"1px solid #e8e0d0", borderRadius:"14px", padding:"20px 24px" }}>
+                        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:"12px", marginBottom:"14px" }}>
+                          <div>
+                            <p style={{ fontFamily:"var(--font-fraunces)", fontSize:"1rem", fontWeight:700, color:"#1a1208", margin:0 }}>{h.mascotas?.nombre ?? "—"}</p>
+                            <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.78rem", color:"#8a7a60", margin:0 }}>
+                              {formatLima(`${h.fecha_consulta}T00:00:00`, "dd/MM/yyyy")}
+                              {h.veterinarios ? ` · Dr. ${h.veterinarios.usuarios.nombre} ${h.veterinarios.usuarios.apellido}` : ""}
+                            </p>
+                          </div>
+                          {h.peso_consulta && <span style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.78rem", fontWeight:600, color:"#3d845b", background:"#f0fdf4", padding:"4px 10px", borderRadius:"99px", whiteSpace:"nowrap" }}>{h.peso_consulta} kg</span>}
+                        </div>
+                        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px" }}>
+                          {[["Diagnóstico", h.diagnostico], ["Tratamiento", h.tratamiento]].map(([l,v]) => (
+                            <div key={l}>
+                              <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.7rem", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.08em", color:"#8a7a60", margin:"0 0 3px" }}>{l}</p>
+                              <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.85rem", color:"#1a1208", margin:0, lineHeight:1.5 }}>{v}</p>
+                            </div>
+                          ))}
+                          {h.observaciones && (
+                            <div style={{ gridColumn:"1/-1" }}>
+                              <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.7rem", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.08em", color:"#8a7a60", margin:"0 0 3px" }}>Observaciones</p>
+                              <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.85rem", color:"#1a1208", margin:0, lineHeight:1.5 }}>{h.observaciones}</p>
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ marginTop:"12px", paddingTop:"10px", borderTop:"1px solid #f5f0e8" }}>
+                          <Link href={`/portal/mascotas/${h.id_mascota}/historia-clinica`}
+                            style={{ display:"inline-flex", alignItems:"center", gap:"6px", fontFamily:"var(--font-dm-sans)", fontSize:"0.75rem", fontWeight:600, color:"#3d845b", textDecoration:"none" }}>
+                            <FileText size={11} /> Ver historial completo y archivos adjuntos <ChevronRight size={11} />
+                          </Link>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* ── SEGUIMIENTOS ── */}
+                {tab === "seguimientos" && (
+                  <SeguimientosTab seguimientos={seguimientos} mascotas={mascotas} loading={false}
+                    onAgendar={(seg) => openBooking({ motivo:`Control: ${seg.motivo_seguimiento}`, mascotaId:seg.id_mascota })} />
+                )}
+              </>
+            )}
+          </div>
+          </div>{/* fin columna principal */}
+
+          {/* ── Sidebar de alertas ── */}
+          <div style={{ width:"260px", flexShrink:0, position:"sticky", top:"88px" }}>
+            <p style={{ margin:"0 0 10px", fontFamily:"var(--font-dm-sans)", fontSize:"0.7rem", fontWeight:700, color:"#8a7a60", textTransform:"uppercase", letterSpacing:"0.09em" }}>
+              Estado y avisos
+            </p>
+            <AlertsSidebar
+              alertasVac={alertasVac}
+              seguimientos={seguimientos}
+              atencionesActivas={atencionesActivas}
+              colaEsperaActiva={colaEsperaActiva}
+              onGoSeguimientos={() => handleTabChange("seguimientos")}
+              onAbrirCola={() => setColaOpen(true)}
+            />
+          </div>
+
+        </div>{/* fin flex row */}
       </main>
 
-      {/* Reschedule modal */}
-      <RescheduleCitaModal
-        cita={rescheduleItem}
-        open={!!rescheduleItem}
-        onClose={() => setRescheduleItem(null)}
-        onRescheduled={() => loadTab("citas")}
-      />
+      {/* ── MODALS ── */}
+      <RescheduleCitaModal  cita={rescheduleItem} open={!!rescheduleItem} onClose={()=>setRescheduleItem(null)} onRescheduled={()=>{ setLoadingTab(true); loadTab("citas"); }} />
+      <RegisterMascotaModal open={mascotaModalOpen} onClose={()=>setMascotaModalOpen(false)} onCreated={()=>{ if(tab==="mascotas"){ setLoadingTab(true); loadTab("mascotas"); } }} />
+      <EditMascotaModal     mascota={editMascota} open={!!editMascota} onClose={()=>setEditMascota(null)} onSaved={()=>{ setLoadingTab(true); loadTab(tab); }} />
+      <ProfileModal         open={profileOpen} onClose={()=>setProfileOpen(false)} />
+      <BookingModal         open={bookingOpen} onClose={()=>setBookingOpen(false)} mascotas={mascotas} prefillMotivo={bookingPrefill.motivo} prefillMascotaId={bookingPrefill.mascotaId} onBooked={()=>{ if(tab==="citas"){ setLoadingTab(true); loadTab("citas"); } }} />
+      <ColaEsperaModal      open={colaOpen} onClose={()=>{ setColaOpen(false); fetch("/api/portal/cola-espera").then(r=>r.json()).then(j=>setColaEsperaActiva(j.data??[])); }} mascotas={mascotas} />
 
-      {/* Register pet modal */}
-      <RegisterMascotaModal
-        open={mascotaModalOpen}
-        onClose={() => setMascotaModalOpen(false)}
-        onCreated={() => { if (tab === "mascotas") loadTab("mascotas"); }}
-      />
-
-      {/* Edit pet modal */}
-      <EditMascotaModal
-        mascota={editMascota}
-        open={!!editMascota}
-        onClose={() => setEditMascota(null)}
-        onSaved={() => loadTab(tab)}
-      />
-
-      {/* Profile modal */}
-      <ProfileModal open={profileOpen} onClose={() => setProfileOpen(false)} />
-
-      {/* Booking modal */}
-      <BookingModal
-        open={bookingOpen}
-        onClose={() => setBookingOpen(false)}
-        mascotas={mascotas}
-        onBooked={() => { if (tab === "citas") loadTab("citas"); }}
-      />
-
-      {/* Cita detail modal */}
+      {/* Cita detail */}
       {detailCita && (
-        <div style={{ position:"fixed", inset:0, zIndex:200, display:"flex", alignItems:"center",
-          justifyContent:"center", padding:"16px" }}>
-          <div style={{ position:"absolute", inset:0, background:"rgba(10,26,17,0.6)", backdropFilter:"blur(6px)" }}
-            onClick={() => setDetailCita(null)} />
-          <div style={{ position:"relative", zIndex:1, background:"#fff", borderRadius:"20px",
-            padding:"28px", maxWidth:"460px", width:"100%", boxShadow:"0 24px 60px rgba(10,26,17,0.25)" }}>
+        <div style={{ position:"fixed", inset:0, zIndex:200, display:"flex", alignItems:"center", justifyContent:"center", padding:"16px" }}>
+          <div style={{ position:"absolute", inset:0, background:"rgba(10,26,17,0.6)", backdropFilter:"blur(6px)" }} onClick={()=>setDetailCita(null)} />
+          <div style={{ position:"relative", zIndex:1, background:"#fff", borderRadius:"20px", padding:"28px", maxWidth:"460px", width:"100%", boxShadow:"0 24px 60px rgba(10,26,17,0.25)" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"20px" }}>
-              <h2 style={{ fontFamily:"var(--font-fraunces)", fontSize:"1.2rem", fontWeight:700, color:"#1a1208", margin:0 }}>
-                Detalle de la cita
-              </h2>
-              <button onClick={() => setDetailCita(null)}
-                style={{ background:"#f5f0e8", border:"none", borderRadius:"8px", width:"32px", height:"32px",
-                  cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center",
-                  fontSize:"1.1rem", color:"#6b5c44" }}>×</button>
+              <h2 style={{ fontFamily:"var(--font-fraunces)", fontSize:"1.2rem", fontWeight:700, color:"#1a1208", margin:0 }}>Detalle de la cita</h2>
+              <button onClick={()=>setDetailCita(null)} style={{ background:"#f5f0e8", border:"none", borderRadius:"8px", width:"32px", height:"32px", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"1.1rem", color:"#6b5c44" }}>×</button>
             </div>
             <div style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
               {[
@@ -1399,80 +506,36 @@ export default function PortalPage() {
                 ["Hora", format12h(detailCita.hora)],
                 ["Veterinario", detailCita.veterinarios ? `${detailCita.veterinarios.usuarios.nombre} ${detailCita.veterinarios.usuarios.apellido}` : "—"],
                 ["Motivo", detailCita.motivo],
-                ["Estado", estadoLabels[detailCita.estado]],
-              ].map(([l,v])=>(
-                <div key={l} style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start",
-                  padding:"10px 0", borderBottom:"1px solid #f0ead8" }}>
-                  <span style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.78rem", fontWeight:600,
-                    textTransform:"uppercase", letterSpacing:"0.07em", color:"#8a7a60", flexShrink:0 }}>{l}</span>
-                  <span style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.88rem", color:"#1a1208",
-                    textAlign:"right", marginLeft:"16px" }}>{v}</span>
+                ["Estado", estadoLabels[detailCita.estado as EstadoCita]],
+              ].map(([l,v]) => (
+                <div key={l} style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", padding:"10px 0", borderBottom:"1px solid #f0ead8" }}>
+                  <span style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.78rem", fontWeight:600, textTransform:"uppercase", letterSpacing:"0.07em", color:"#8a7a60", flexShrink:0 }}>{l}</span>
+                  <span style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.88rem", color:"#1a1208", textAlign:"right", marginLeft:"16px" }}>{v}</span>
                 </div>
               ))}
             </div>
-            <button onClick={() => setDetailCita(null)}
-              style={{ marginTop:"20px", width:"100%", background:"#0a1a11", color:"#fff",
-                border:"none", cursor:"pointer", padding:"12px", borderRadius:"10px",
-                fontFamily:"var(--font-dm-sans)", fontSize:"0.88rem", fontWeight:600 }}>
-              Cerrar
-            </button>
+            <button onClick={()=>setDetailCita(null)} style={{ marginTop:"20px", width:"100%", background:"#0a1a11", color:"#fff", border:"none", cursor:"pointer", padding:"12px", borderRadius:"10px", fontFamily:"var(--font-dm-sans)", fontSize:"0.88rem", fontWeight:600 }}>Cerrar</button>
           </div>
         </div>
       )}
 
-      {/* Sin mascotas — aviso antes de agendar */}
+      {/* Sin mascotas alert */}
       {noMascotasAlert && (
-        <div style={{ position:"fixed", inset:0, zIndex:200, display:"flex", alignItems:"center",
-          justifyContent:"center", padding:"16px" }}>
-          <div style={{ position:"absolute", inset:0, background:"rgba(6,18,9,0.7)", backdropFilter:"blur(8px)" }}
-            onClick={() => setNoMascotasAlert(false)} />
-          <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:"420px",
-            background:"#fff", borderRadius:"24px", overflow:"hidden",
-            boxShadow:"0 32px 80px rgba(10,26,17,0.4)" }}>
-            {/* Header */}
-            <div style={{ background:"linear-gradient(135deg,#0a1a11,#0f2318)", padding:"22px 24px",
-              display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+        <div style={{ position:"fixed", inset:0, zIndex:200, display:"flex", alignItems:"center", justifyContent:"center", padding:"16px" }}>
+          <div style={{ position:"absolute", inset:0, background:"rgba(6,18,9,0.7)", backdropFilter:"blur(8px)" }} onClick={()=>setNoMascotasAlert(false)} />
+          <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:"420px", background:"#fff", borderRadius:"24px", overflow:"hidden", boxShadow:"0 32px 80px rgba(10,26,17,0.4)" }}>
+            <div style={{ background:"linear-gradient(135deg,#0a1a11,#0f2318)", padding:"22px 24px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
               <div style={{ display:"flex", alignItems:"center", gap:"12px" }}>
-                <div style={{ width:"38px", height:"38px", borderRadius:"10px",
-                  background:"rgba(196,140,52,0.18)", border:"1px solid rgba(196,140,52,0.3)",
-                  display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                  <PawPrint size={18} color="#c48c34" />
-                </div>
-                <p style={{ fontFamily:"var(--font-fraunces)", fontSize:"1.05rem", fontWeight:700,
-                  fontStyle:"italic", color:"#fff", margin:0 }}>
-                  Registra tu mascota primero
-                </p>
+                <div style={{ width:"38px", height:"38px", borderRadius:"10px", background:"rgba(196,140,52,0.18)", border:"1px solid rgba(196,140,52,0.3)", display:"flex", alignItems:"center", justifyContent:"center" }}><PawPrint size={18} color="#c48c34" /></div>
+                <p style={{ fontFamily:"var(--font-fraunces)", fontSize:"1.05rem", fontWeight:700, fontStyle:"italic", color:"#fff", margin:0 }}>Registra tu mascota primero</p>
               </div>
-              <button onClick={() => setNoMascotasAlert(false)}
-                style={{ background:"rgba(255,255,255,0.08)", border:"none", cursor:"pointer",
-                  width:"30px", height:"30px", borderRadius:"8px", display:"flex",
-                  alignItems:"center", justifyContent:"center", color:"rgba(255,255,255,0.5)" }}>
-                <X size={14} />
-              </button>
+              <button onClick={()=>setNoMascotasAlert(false)} style={{ background:"rgba(255,255,255,0.08)", border:"none", cursor:"pointer", width:"30px", height:"30px", borderRadius:"8px", display:"flex", alignItems:"center", justifyContent:"center", color:"rgba(255,255,255,0.5)" }}><X size={14} /></button>
             </div>
-            {/* Body */}
             <div style={{ padding:"24px" }}>
-              <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.9rem", color:"#4a3d2e",
-                lineHeight:1.65, margin:"0 0 6px" }}>
-                Para agendar una cita necesitas tener al menos una mascota registrada en tu cuenta.
-              </p>
-              <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.85rem", color:"#8a7a60",
-                lineHeight:1.6, margin:"0 0 24px" }}>
-                Registra a tu mascota y luego podrás solicitar una cita con nuestros veterinarios.
-              </p>
+              <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.9rem", color:"#4a3d2e", lineHeight:1.65, margin:"0 0 24px" }}>Para agendar una cita necesitas tener al menos una mascota registrada en tu cuenta.</p>
               <div style={{ display:"flex", gap:"10px" }}>
-                <button onClick={() => setNoMascotasAlert(false)}
-                  style={{ flex:1, height:"42px", borderRadius:"10px", border:"1.5px solid #e8e0d0",
-                    background:"#fdfaf5", color:"#4a3d2e", fontSize:"0.88rem", fontWeight:600,
-                    fontFamily:"var(--font-dm-sans)", cursor:"pointer" }}>
-                  Cancelar
-                </button>
-                <button onClick={() => { setNoMascotasAlert(false); setMascotaModalOpen(true); }}
-                  style={{ flex:1, height:"42px", borderRadius:"10px", border:"none",
-                    background:"linear-gradient(135deg,#3d845b,#2d6647)", color:"#fff",
-                    fontSize:"0.88rem", fontWeight:600, fontFamily:"var(--font-dm-sans)",
-                    cursor:"pointer", display:"flex", alignItems:"center",
-                    justifyContent:"center", gap:"6px" }}>
+                <button onClick={()=>setNoMascotasAlert(false)} style={{ flex:1, height:"42px", borderRadius:"10px", border:"1.5px solid #e8e0d0", background:"#fdfaf5", color:"#4a3d2e", fontSize:"0.88rem", fontWeight:600, fontFamily:"var(--font-dm-sans)", cursor:"pointer" }}>Cancelar</button>
+                <button onClick={()=>{ setNoMascotasAlert(false); setMascotaModalOpen(true); }} style={{ flex:1, height:"42px", borderRadius:"10px", border:"none", background:"linear-gradient(135deg,#3d845b,#2d6647)", color:"#fff", fontSize:"0.88rem", fontWeight:600, fontFamily:"var(--font-dm-sans)", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:"6px" }}>
                   <PawPrint size={14} /> Registrar mascota
                 </button>
               </div>
@@ -1482,55 +545,25 @@ export default function PortalPage() {
       )}
 
       {/* Logout modal */}
-      {showLogout && (
-        <div style={{ position:"fixed", inset:0, zIndex:300, display:"flex", alignItems:"center",
-          justifyContent:"center", padding:"16px" }}>
-          <div style={{ position:"absolute", inset:0, background:"rgba(6,18,9,0.7)", backdropFilter:"blur(8px)" }}
-            onClick={() => setShowLogout(false)} />
-          <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:"380px",
-            background:"#fff", borderRadius:"20px", overflow:"hidden",
-            boxShadow:"0 32px 80px rgba(6,18,9,0.35)" }}
-            onClick={e => e.stopPropagation()}>
-            <div style={{ background:"linear-gradient(135deg,#0a1a11,#0f2318)", padding:"24px 24px 20px",
-              display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+      {showLogoutModal && (
+        <div style={{ position:"fixed", inset:0, zIndex:300, display:"flex", alignItems:"center", justifyContent:"center", padding:"16px" }}>
+          <div style={{ position:"absolute", inset:0, background:"rgba(6,18,9,0.7)", backdropFilter:"blur(8px)" }} onClick={()=>setShowLogoutModal(false)} />
+          <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:"380px", background:"#fff", borderRadius:"20px", overflow:"hidden", boxShadow:"0 32px 80px rgba(6,18,9,0.35)" }} onClick={e=>e.stopPropagation()}>
+            <div style={{ background:"linear-gradient(135deg,#0a1a11,#0f2318)", padding:"24px 24px 20px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
               <div style={{ display:"flex", alignItems:"center", gap:"12px" }}>
-                <div style={{ width:"40px", height:"40px", borderRadius:"11px",
-                  background:"rgba(196,140,52,0.18)", border:"1px solid rgba(196,140,52,0.3)",
-                  display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                  <LogOut size={18} color="#c48c34" />
-                </div>
+                <div style={{ width:"40px", height:"40px", borderRadius:"11px", background:"rgba(196,140,52,0.18)", border:"1px solid rgba(196,140,52,0.3)", display:"flex", alignItems:"center", justifyContent:"center" }}><LogOut size={18} color="#c48c34" /></div>
                 <div>
-                  <p style={{ fontFamily:"var(--font-fraunces)", fontSize:"1.05rem", fontWeight:700,
-                    fontStyle:"italic", color:"#fff", margin:0 }}>Cerrar sesión</p>
-                  <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.72rem",
-                    color:"rgba(255,255,255,0.4)", margin:0 }}>PetCare · Portal del cliente</p>
+                  <p style={{ fontFamily:"var(--font-fraunces)", fontSize:"1.05rem", fontWeight:700, fontStyle:"italic", color:"#fff", margin:0 }}>Cerrar sesión</p>
+                  <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.72rem", color:"rgba(255,255,255,0.4)", margin:0 }}>PetCare · Portal del cliente</p>
                 </div>
               </div>
-              <button onClick={() => setShowLogout(false)}
-                style={{ background:"rgba(255,255,255,0.08)", border:"none", cursor:"pointer",
-                  width:"30px", height:"30px", borderRadius:"8px", display:"flex",
-                  alignItems:"center", justifyContent:"center", color:"rgba(255,255,255,0.5)" }}>
-                <X size={14} />
-              </button>
+              <button onClick={()=>setShowLogoutModal(false)} style={{ background:"rgba(255,255,255,0.08)", border:"none", cursor:"pointer", width:"30px", height:"30px", borderRadius:"8px", display:"flex", alignItems:"center", justifyContent:"center", color:"rgba(255,255,255,0.5)" }}><X size={14} /></button>
             </div>
             <div style={{ padding:"24px" }}>
-              <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.9rem", color:"#4a3d2e",
-                lineHeight:1.65, margin:"0 0 24px" }}>
-                Tu sesión se cerrará y serás redirigido a la página de inicio.
-              </p>
+              <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.9rem", color:"#4a3d2e", lineHeight:1.65, margin:"0 0 24px" }}>Tu sesión se cerrará y serás redirigido a la página de inicio.</p>
               <div style={{ display:"flex", gap:"10px" }}>
-                <button onClick={() => setShowLogout(false)}
-                  style={{ flex:1, height:"42px", borderRadius:"10px", border:"1.5px solid #e8e0d0",
-                    background:"#fdfaf5", color:"#4a3d2e", fontSize:"0.88rem", fontWeight:600,
-                    fontFamily:"var(--font-dm-sans)", cursor:"pointer" }}>
-                  Cancelar
-                </button>
-                <button onClick={() => logout("/")}
-                  style={{ flex:1, height:"42px", borderRadius:"10px", border:"none",
-                    background:"linear-gradient(135deg,#0a1a11,#162e20)", color:"#fff",
-                    fontSize:"0.88rem", fontWeight:600, fontFamily:"var(--font-dm-sans)",
-                    cursor:"pointer", display:"flex", alignItems:"center",
-                    justifyContent:"center", gap:"6px" }}>
+                <button onClick={()=>setShowLogoutModal(false)} style={{ flex:1, height:"42px", borderRadius:"10px", border:"1.5px solid #e8e0d0", background:"#fdfaf5", color:"#4a3d2e", fontSize:"0.88rem", fontWeight:600, fontFamily:"var(--font-dm-sans)", cursor:"pointer" }}>Cancelar</button>
+                <button onClick={()=>logout("/")} style={{ flex:1, height:"42px", borderRadius:"10px", border:"none", background:"linear-gradient(135deg,#0a1a11,#162e20)", color:"#fff", fontSize:"0.88rem", fontWeight:600, fontFamily:"var(--font-dm-sans)", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:"6px" }}>
                   <LogOut size={14} /> Cerrar sesión
                 </button>
               </div>

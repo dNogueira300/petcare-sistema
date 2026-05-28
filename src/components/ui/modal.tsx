@@ -54,8 +54,8 @@ export function Modal({
             </button>
           </div>
         )}
-        {/* Contenido scrolleable — sin padding-bottom: lo provee el footer sticky */}
-        <div className="px-6 pt-4 pb-0 overflow-y-auto flex-1">{children}</div>
+        {/* Contenido scrolleable con padding inferior para que nada quede pegado al borde */}
+        <div className="px-6 pt-4 pb-6 overflow-y-auto flex-1">{children}</div>
       </div>
     </div>
   );

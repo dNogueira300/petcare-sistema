@@ -121,11 +121,20 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Estado inválido" }, { status: 400 });
   }
 
-  if (session.rol === "cliente" && parsed.data.estado !== "cancelada") {
-    return NextResponse.json({ error: "Solo puedes cancelar citas" }, { status: 403 });
+  if (session.rol === "cliente" && !["cancelada", "confirmada"].includes(parsed.data.estado)) {
+    return NextResponse.json({ error: "Solo puedes cancelar o confirmar tus propias citas" }, { status: 403 });
   }
 
   const admin = createAdminClient();
+
+  // El cliente solo puede confirmar citas en estado pendiente
+  if (session.rol === "cliente" && parsed.data.estado === "confirmada") {
+    const { data: citaCheck } = await admin
+      .from("citas").select("estado").eq("id_cita", id).single();
+    if (citaCheck && citaCheck.estado !== "pendiente") {
+      return NextResponse.json({ error: "Solo puedes confirmar citas pendientes" }, { status: 400 });
+    }
+  }
 
   if (parsed.data.estado === "atendida") {
     const { data: citaInfo } = await admin
@@ -155,6 +164,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     }
   }
 
+  // Obtener datos de la cita SIN depender de id_atencion_clinica
+  // (esa columna puede no existir si la migración no se ejecutó aún)
+  const { data: citaActual } = await admin
+    .from("citas")
+    .select("id_mascota, id_veterinario, motivo")
+    .eq("id_cita", id)
+    .single();
+
   const { data, error } = await admin
     .from("citas")
     .update({ estado: parsed.data.estado })
@@ -163,5 +180,70 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // ── Sincronizar atención clínica ──────────────────────────────────────────
+  // Consulta directa a atenciones_clinicas por id_cita — no depende de la columna
+  // id_atencion_clinica en citas (puede no existir si la migración no corrió).
+  if (citaActual) {
+    try {
+      const { data: atencionExistente } = await admin
+        .from("atenciones_clinicas")
+        .select("id_atencion, estado_actual")
+        .eq("id_cita", Number(id))
+        .maybeSingle();
+
+      if (parsed.data.estado === "confirmada" && !atencionExistente) {
+        // Crear atención clínica al confirmar si no existe
+        const { data: nueva } = await admin
+          .from("atenciones_clinicas")
+          .insert({
+            id_cita:         Number(id),
+            id_mascota:      citaActual.id_mascota,
+            id_veterinario:  citaActual.id_veterinario,
+            estado_actual:   "confirmada",
+            motivo_consulta: citaActual.motivo ?? null,
+            prioridad:       "normal",
+          })
+          .select("id_atencion")
+          .single();
+
+        if (nueva) {
+          // Intentar vincular cita → atención (puede fallar si columna no existe)
+          await admin
+            .from("citas")
+            .update({ id_atencion_clinica: nueva.id_atencion })
+            .eq("id_cita", id);
+
+          await admin.from("transiciones_estado").insert({
+            id_atencion:     nueva.id_atencion,
+            estado_anterior: "reservada",
+            estado_nuevo:    "confirmada",
+            id_usuario:      session.id_usuario,
+            razon:           "Cita confirmada",
+          });
+        }
+      } else if (parsed.data.estado === "cancelada" && atencionExistente) {
+        // Cancelar la atención vinculada si no está ya en estado terminal
+        if (!["finalizado","cancelada","no_asistio"].includes(atencionExistente.estado_actual)) {
+          await admin
+            .from("atenciones_clinicas")
+            .update({ estado_actual: "cancelada", fecha_estado_actual: new Date().toISOString() })
+            .eq("id_atencion", atencionExistente.id_atencion);
+
+          await admin.from("transiciones_estado").insert({
+            id_atencion:     atencionExistente.id_atencion,
+            estado_anterior: atencionExistente.estado_actual,
+            estado_nuevo:    "cancelada",
+            id_usuario:      session.id_usuario,
+            razon:           "Cita cancelada",
+          });
+        }
+      }
+    } catch {
+      // La tabla atenciones_clinicas no existe aún (migración pendiente).
+      // No bloquear el cambio de estado de la cita por esto.
+    }
+  }
+
   return NextResponse.json({ data });
 }

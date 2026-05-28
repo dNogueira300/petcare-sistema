@@ -46,6 +46,7 @@ export function VacunaForm({ idMascota, onSuccess }: VacunaFormProps) {
   const [fechaAplicacion, setFechaAplicacion] = useState(hoyCimaFecha());
   const [frecuencia, setFrecuencia] = useState<Frecuencia | "">("");
   const [lote, setLote] = useState("");
+  const [fechaVencLote, setFechaVencLote] = useState("");
   const [observaciones, setObservaciones] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -94,12 +95,13 @@ export function VacunaForm({ idMascota, onSuccess }: VacunaFormProps) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        id_mascota: idMascota,
-        tipo_vacuna: tipoFinal,
-        fecha_aplicacion: fechaAplicacion,
+        id_mascota:             idMascota,
+        tipo_vacuna:            tipoFinal,
+        fecha_aplicacion:       fechaAplicacion,
         frecuencia,
-        lote: lote || undefined,
-        observaciones: observaciones || undefined,
+        lote:                   lote || undefined,
+        fecha_vencimiento_lote: fechaVencLote || undefined,
+        observaciones:          observaciones || undefined,
       }),
     });
     setSubmitting(false);
@@ -162,8 +164,28 @@ export function VacunaForm({ idMascota, onSuccess }: VacunaFormProps) {
         <p className="text-xs text-gray-500">Esta vacuna no requiere dosis de refuerzo.</p>
       )}
 
-      <Input label="Lote (opcional)" placeholder="N.º de lote del vial"
-        value={lote} onChange={(e) => setLote(e.target.value)} />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Input label="Lote (opcional)" placeholder="N.º de lote del vial"
+          value={lote} onChange={(e) => setLote(e.target.value)} />
+        <div>
+          <Input
+            label="Vencimiento del lote (opcional)"
+            type="date"
+            value={fechaVencLote}
+            onChange={(e) => setFechaVencLote(e.target.value)}
+          />
+          {fechaVencLote && fechaVencLote < hoyCimaFecha() && (
+            <p className="mt-1 text-xs text-red-600 font-semibold">
+              ⚠️ El lote está vencido — no se permitirá registrar la vacuna.
+            </p>
+          )}
+          {fechaVencLote && fechaVencLote >= hoyCimaFecha() && (
+            <p className="mt-1 text-xs text-green-600">
+              ✓ Lote vigente hasta {fechaVencLote}
+            </p>
+          )}
+        </div>
+      </div>
       <Textarea label="Observaciones (opcional)" placeholder="Reacciones, notas…"
         value={observaciones} onChange={(e) => setObservaciones(e.target.value)} />
 

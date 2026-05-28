@@ -11,6 +11,9 @@ import {
   Users2,
   BarChart2,
   ChevronDown,
+  ClipboardList,
+  Layers,
+  Building2,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { canAccess } from "@/lib/rbac";
@@ -59,7 +62,60 @@ const navItems: NavItem[] = [
       { href: "/usuarios", label: "Staff", module: "usuarios" },
     ],
   },
-  { href: "/reportes", icon: BarChart2, label: "Reportes", module: "reportes" },
+  {
+    icon: ClipboardList,
+    label: "Clínica",
+    children: [
+      {
+        href: "/atenciones-clinicas",
+        label: "Atenciones",
+        module: "atenciones-clinicas",
+      },
+      { href: "/triaje", label: "Triaje", module: "triaje" },
+    ],
+  },
+  {
+    icon: Building2,
+    label: "Operaciones",
+    children: [
+      {
+        href: "/seguimientos-clinicos",
+        label: "Seguimientos",
+        module: "seguimientos-clinicos",
+      },
+      {
+        href: "/indisponibilidades",
+        label: "Indisponibilidades",
+        module: "indisponibilidades",
+      },
+      { href: "/cola-espera", label: "Cola de Espera", module: "cola-espera" },
+    ],
+  },
+  {
+    icon: Layers,
+    label: "Configuración",
+    children: [
+      {
+        href: "/especialidades",
+        label: "Especialidades",
+        module: "especialidades",
+      },
+      {
+        href: "/servicios-medicos",
+        label: "Servicios Médicos",
+        module: "servicios-medicos",
+      },
+      { href: "/recursos", label: "Recursos", module: "recursos" },
+    ],
+  },
+  {
+    icon: BarChart2,
+    label: "Reportes",
+    children: [
+      { href: "/reportes", label: "Reportes", module: "reportes" },
+      { href: "/analitica", label: "Analítica", module: "analitica" },
+    ],
+  },
 ];
 
 interface SidebarProps {

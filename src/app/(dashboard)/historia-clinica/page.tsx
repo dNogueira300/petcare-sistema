@@ -6,6 +6,8 @@ import { Table, type Column } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { HistoriaClinicaForm } from "@/components/forms/HistoriaClinicaForm";
+import { AuditoriaTimeline } from "@/components/ui/auditoria-timeline";
+import { ArchivosClinicosPanel } from "@/components/ui/archivos-clinicos";
 import { formatLima } from "@/utils/datetime";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/context/toast";
@@ -19,7 +21,15 @@ interface HistoriaRow {
   tratamiento: string;
   observaciones: string | null;
   peso_consulta: number | null;
-  mascotas: { nombre: string; especie?: string; raza?: string | null; sexo?: string | null; color?: string | null; fecha_nacimiento?: string | null; clientes?: { usuarios: { nombre: string; apellido: string } } };
+  mascotas: {
+    nombre: string;
+    especie?: string;
+    raza?: string | null;
+    sexo?: string | null;
+    color?: string | null;
+    fecha_nacimiento?: string | null;
+    clientes?: { usuarios: { nombre: string; apellido: string } };
+  };
   veterinarios: { usuarios: { nombre: string; apellido: string } };
 }
 
@@ -33,7 +43,9 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col gap-0.5">
       <span className="text-xs font-medium text-gray-500">{label}</span>
-      <span className="text-sm text-gray-900 whitespace-pre-wrap">{value || "—"}</span>
+      <span className="text-sm text-gray-900 whitespace-pre-wrap">
+        {value || "—"}
+      </span>
     </div>
   );
 }
@@ -48,12 +60,18 @@ function EditHistoriaForm({
   const [fechaConsulta, setFechaConsulta] = useState(historia.fecha_consulta);
   const [diagnostico, setDiagnostico] = useState(historia.diagnostico);
   const [tratamiento, setTratamiento] = useState(historia.tratamiento);
-  const [observaciones, setObservaciones] = useState(historia.observaciones ?? "");
-  const [peso, setPeso] = useState(historia.peso_consulta ? String(historia.peso_consulta) : "");
+  const [observaciones, setObservaciones] = useState(
+    historia.observaciones ?? "",
+  );
+  const [peso, setPeso] = useState(
+    historia.peso_consulta ? String(historia.peso_consulta) : "",
+  );
   const [submitting, setSubmitting] = useState(false);
 
-  const inputCls = "w-full rounded-[9px] border border-gray-200 px-3 py-2 text-sm focus:border-petcare-500 focus:outline-none focus:ring-2 focus:ring-petcare-100";
-  const labelCls = "text-xs font-semibold uppercase tracking-wide text-gray-500";
+  const inputCls =
+    "w-full rounded-[9px] border border-gray-200 px-3 py-2 text-sm focus:border-petcare-500 focus:outline-none focus:ring-2 focus:ring-petcare-100";
+  const labelCls =
+    "text-xs font-semibold uppercase tracking-wide text-gray-500";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,9 +90,12 @@ function EditHistoriaForm({
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div className="rounded-lg border border-petcare-200 bg-petcare-50/40 px-4 py-3">
         <p className={`${labelCls} mb-1`}>Mascota</p>
-        <p className="text-sm font-medium text-gray-900">{historia.mascotas?.nombre ?? "—"}</p>
+        <p className="text-sm font-medium text-gray-900">
+          {historia.mascotas?.nombre ?? "—"}
+        </p>
         <p className="text-xs text-gray-500 mt-0.5">
-          Vet: {historia.veterinarios?.usuarios
+          Vet:{" "}
+          {historia.veterinarios?.usuarios
             ? `${historia.veterinarios.usuarios.nombre} ${historia.veterinarios.usuarios.apellido}`
             : "—"}
         </p>
@@ -134,8 +155,16 @@ function EditHistoriaForm({
         />
       </div>
 
-      <div style={{ position: "sticky", bottom: 0, background: "#fff",
-        borderTop: "1px solid #f0ead8", padding: "12px 0 16px", marginTop: "4px" }}>
+      <div
+        style={{
+          position: "sticky",
+          bottom: 0,
+          background: "#fff",
+          borderTop: "1px solid #f0ead8",
+          padding: "12px 0 16px",
+          marginTop: "4px",
+        }}
+      >
         <Button type="submit" loading={submitting} className="w-full">
           Guardar cambios
         </Button>
@@ -146,7 +175,9 @@ function EditHistoriaForm({
 
 export default function HistoriaClinicaPage() {
   const [historias, setHistorias] = useState<HistoriaRow[]>([]);
-  const [mascotasDisponibles, setMascotasDisponibles] = useState<MascotaOption[]>([]);
+  const [mascotasDisponibles, setMascotasDisponibles] = useState<
+    MascotaOption[]
+  >([]);
   const [mascotaFilter, setMascotaFilter] = useState<number | "all">("all");
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
@@ -154,44 +185,78 @@ export default function HistoriaClinicaPage() {
   const [editItem, setEditItem] = useState<HistoriaRow | null>(null);
   const { user } = useAuth();
   const isAdmin = user?.rol === "administrador";
-  const puedeCrear = user?.rol === "administrador" || user?.rol === "veterinario";
+  const puedeCrear =
+    user?.rol === "administrador" || user?.rol === "veterinario";
   const toast = useToast();
 
-  const fetchHistorias = async () => {
+  // Refresco manual (handlers de eventos — setState síncrono está bien aquí)
+  const fetchHistorias = () => {
     setLoading(true);
-    const [hRes, mRes] = await Promise.all([
-      fetch("/api/historia-clinica").then((r) => r.json()).catch(() => ({})),
-      fetch("/api/mascotas").then((r) => r.json()).catch(() => ({})),
-    ]);
-    setHistorias(hRes.data ?? []);
-    setMascotasDisponibles(
-      (mRes.data ?? []).map((m: MascotaOption) => ({
-        id_mascota: m.id_mascota,
-        nombre: m.nombre,
-        especie: m.especie,
-      })),
-    );
-    setLoading(false);
+    Promise.all([
+      fetch("/api/historia-clinica")
+        .then((r) => r.json())
+        .catch(() => ({})),
+      fetch("/api/mascotas")
+        .then((r) => r.json())
+        .catch(() => ({})),
+    ]).then(([hRes, mRes]) => {
+      setHistorias(hRes.data ?? []);
+      setMascotasDisponibles(
+        (mRes.data ?? []).map((m: MascotaOption) => ({
+          id_mascota: m.id_mascota,
+          nombre: m.nombre,
+          especie: m.especie,
+        })),
+      );
+      setLoading(false);
+    });
   };
 
-  useEffect(() => { fetchHistorias(); }, []);
+  // Carga inicial — sin setState síncrono en el efecto (loading arranca en true)
+  useEffect(() => {
+    Promise.all([
+      fetch("/api/historia-clinica")
+        .then((r) => r.json())
+        .catch(() => ({})),
+      fetch("/api/mascotas")
+        .then((r) => r.json())
+        .catch(() => ({})),
+    ]).then(([hRes, mRes]) => {
+      setHistorias(hRes.data ?? []);
+      setMascotasDisponibles(
+        (mRes.data ?? []).map((m: MascotaOption) => ({
+          id_mascota: m.id_mascota,
+          nombre: m.nombre,
+          especie: m.especie,
+        })),
+      );
+      setLoading(false);
+    });
+  }, []);
 
-  const historiasFiltradas = useMemo(() => (
-    mascotaFilter === "all"
-      ? historias
-      : historias.filter((h) => h.id_mascota === mascotaFilter)
-  ), [historias, mascotaFilter]);
+  const historiasFiltradas = useMemo(
+    () =>
+      mascotaFilter === "all"
+        ? historias
+        : historias.filter((h) => h.id_mascota === mascotaFilter),
+    [historias, mascotaFilter],
+  );
 
   const handleDescargarPdf = async () => {
-    const mascotasParaPdf = mascotaFilter === "all"
-      ? mascotasDisponibles.filter((m) => historias.some((h) => h.id_mascota === m.id_mascota))
-      : mascotasDisponibles.filter((m) => m.id_mascota === mascotaFilter);
+    const mascotasParaPdf =
+      mascotaFilter === "all"
+        ? mascotasDisponibles.filter((m) =>
+            historias.some((h) => h.id_mascota === m.id_mascota),
+          )
+        : mascotasDisponibles.filter((m) => m.id_mascota === mascotaFilter);
     if (mascotasParaPdf.length === 0) {
       toast.error("No hay historias clínicas para exportar");
       return;
     }
     for (const m of mascotasParaPdf) {
-      const historiasMascota = historias.filter((h) => h.id_mascota === m.id_mascota);
+      const historiasMascota = historias.filter(
+        (h) => h.id_mascota === m.id_mascota,
+      );
       const ref = historiasMascota[0]?.mascotas;
       await exportHistorialPdf({
         mascota: {
@@ -248,20 +313,27 @@ export default function HistoriaClinicaPage() {
       header: "Fecha",
       render: (h) => formatLima(`${h.fecha_consulta}T00:00:00`, "dd/MM/yyyy"),
     },
-    { key: "mascota", header: "Mascota", render: (h) => h.mascotas?.nombre ?? "—" },
+    {
+      key: "mascota",
+      header: "Mascota",
+      render: (h) => h.mascotas?.nombre ?? "—",
+    },
     {
       key: "veterinario",
       header: "Veterinario",
       className: "hidden sm:table-cell",
-      render: (h) => h.veterinarios
-        ? `${h.veterinarios.usuarios.nombre} ${h.veterinarios.usuarios.apellido}`
-        : "—",
+      render: (h) =>
+        h.veterinarios
+          ? `${h.veterinarios.usuarios.nombre} ${h.veterinarios.usuarios.apellido}`
+          : "—",
     },
     {
       key: "diagnostico",
       header: "Diagnóstico",
       render: (h) => (
-        <span className="line-clamp-1 max-w-xs" title={h.diagnostico}>{h.diagnostico}</span>
+        <span className="line-clamp-1 max-w-xs" title={h.diagnostico}>
+          {h.diagnostico}
+        </span>
       ),
     },
     {
@@ -300,11 +372,19 @@ export default function HistoriaClinicaPage() {
     <div className="flex flex-col gap-4 sm:gap-6">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Historia Clínica</h1>
-          <p className="text-sm text-gray-500">Registros de consultas y tratamientos</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
+            Historia Clínica
+          </h1>
+          <p className="text-sm text-gray-500">
+            Registros de consultas y tratamientos
+          </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="secondary" onClick={handleDescargarPdf} disabled={historiasFiltradas.length === 0}>
+          <Button
+            variant="secondary"
+            onClick={handleDescargarPdf}
+            disabled={historiasFiltradas.length === 0}
+          >
             <Download className="size-4" />
             <span className="hidden sm:inline">Descargar PDF</span>
             <span className="sm:hidden">PDF</span>
@@ -321,42 +401,114 @@ export default function HistoriaClinicaPage() {
 
       {mascotasDisponibles.length > 1 && (
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Mascota</span>
+          <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+            Mascota
+          </span>
           <select
             value={String(mascotaFilter)}
-            onChange={(e) => setMascotaFilter(e.target.value === "all" ? "all" : Number(e.target.value))}
+            onChange={(e) =>
+              setMascotaFilter(
+                e.target.value === "all" ? "all" : Number(e.target.value),
+              )
+            }
             className="h-9 rounded-lg border border-gray-200 px-3 text-sm focus:border-petcare-500 focus:outline-none focus:ring-2 focus:ring-petcare-100"
           >
             <option value="all">Todas las mascotas</option>
             {mascotasDisponibles.map((m) => (
-              <option key={m.id_mascota} value={m.id_mascota}>{m.nombre} ({m.especie})</option>
+              <option key={m.id_mascota} value={m.id_mascota}>
+                {m.nombre} ({m.especie})
+              </option>
             ))}
           </select>
         </div>
       )}
 
-      <Table columns={columns} data={historiasFiltradas} keyField="id_historia" loading={loading} emptyMessage="No hay historias clínicas registradas" />
+      <Table
+        columns={columns}
+        data={historiasFiltradas}
+        keyField="id_historia"
+        loading={loading}
+        emptyMessage="No hay historias clínicas registradas"
+      />
 
-      <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Nueva historia clínica" className="max-w-2xl">
+      <Modal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        title="Nueva historia clínica"
+        className="max-w-2xl"
+      >
         <HistoriaClinicaForm onSubmit={handleCreate} />
       </Modal>
 
-      <Modal open={!!editItem} onClose={() => setEditItem(null)} title="Editar historia clínica" className="max-w-2xl">
-        {editItem && <EditHistoriaForm historia={editItem} onSubmit={handleEdit} />}
+      <Modal
+        open={!!editItem}
+        onClose={() => setEditItem(null)}
+        title="Editar historia clínica"
+        className="max-w-2xl"
+      >
+        {editItem && (
+          <EditHistoriaForm historia={editItem} onSubmit={handleEdit} />
+        )}
       </Modal>
 
-      <Modal open={!!detailItem} onClose={() => setDetailItem(null)} title="Historia clínica" className="max-w-2xl">
+      <Modal
+        open={!!detailItem}
+        onClose={() => setDetailItem(null)}
+        title="Historia clínica"
+        className="max-w-2xl"
+      >
         {detailItem && (
           <div className="flex flex-col gap-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <DetailRow label="Fecha" value={formatLima(`${detailItem.fecha_consulta}T00:00:00`, "dd/MM/yyyy")} />
-              <DetailRow label="Mascota" value={detailItem.mascotas?.nombre ?? "—"} />
-              <DetailRow label="Veterinario" value={detailItem.veterinarios ? `${detailItem.veterinarios.usuarios.nombre} ${detailItem.veterinarios.usuarios.apellido}` : "—"} />
-              <DetailRow label="Peso en consulta" value={detailItem.peso_consulta ? `${detailItem.peso_consulta} kg` : "—"} />
+              <DetailRow
+                label="Fecha"
+                value={formatLima(
+                  `${detailItem.fecha_consulta}T00:00:00`,
+                  "dd/MM/yyyy",
+                )}
+              />
+              <DetailRow
+                label="Mascota"
+                value={detailItem.mascotas?.nombre ?? "—"}
+              />
+              <DetailRow
+                label="Veterinario"
+                value={
+                  detailItem.veterinarios
+                    ? `${detailItem.veterinarios.usuarios.nombre} ${detailItem.veterinarios.usuarios.apellido}`
+                    : "—"
+                }
+              />
+              <DetailRow
+                label="Peso en consulta"
+                value={
+                  detailItem.peso_consulta
+                    ? `${detailItem.peso_consulta} kg`
+                    : "—"
+                }
+              />
             </div>
             <DetailRow label="Diagnóstico" value={detailItem.diagnostico} />
             <DetailRow label="Tratamiento" value={detailItem.tratamiento} />
-            {detailItem.observaciones && <DetailRow label="Observaciones" value={detailItem.observaciones} />}
+            {detailItem.observaciones && (
+              <DetailRow
+                label="Observaciones"
+                value={detailItem.observaciones}
+              />
+            )}
+            {/* Fase 9 + Fase 4: Archivos y Auditoría lado a lado */}
+            <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
+              <div style={{ flex:"1 1 200px" }}>
+                <ArchivosClinicosPanel
+                  id_historia={detailItem.id_historia}
+                  id_mascota={detailItem.id_mascota}
+                  readOnly={user?.rol === "recepcionista"}
+                />
+              </div>
+              <div style={{ flex:"1 1 200px" }}>
+                <AuditoriaTimeline id_historia={detailItem.id_historia} />
+              </div>
+            </div>
           </div>
         )}
       </Modal>

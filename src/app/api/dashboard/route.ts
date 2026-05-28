@@ -5,7 +5,8 @@ import { hoyCimaFecha } from "@/utils/datetime";
 
 export async function GET() {
   const session = await getSessionUser();
-  if (!session) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  if (!session)
+    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
 
   const supabase = createAdminClient();
 
@@ -30,14 +31,27 @@ export async function GET() {
     { data: citas_raw },
     { data: proximas_raw },
   ] = await Promise.all([
-    supabase.from("citas").select("*", { count: "exact", head: true }).eq("fecha", hoy),
-    supabase.from("citas").select("*", { count: "exact", head: true }).gte("fecha", inicioSemana).lte("fecha", finSemana),
-    supabase.from("citas").select("*", { count: "exact", head: true }).eq("estado", "pendiente"),
+    supabase
+      .from("citas")
+      .select("*", { count: "exact", head: true })
+      .eq("fecha", hoy),
+    supabase
+      .from("citas")
+      .select("*", { count: "exact", head: true })
+      .gte("fecha", inicioSemana)
+      .lte("fecha", finSemana),
+    supabase
+      .from("citas")
+      .select("*", { count: "exact", head: true })
+      .eq("estado", "pendiente"),
     supabase.from("clientes").select("*", { count: "exact", head: true }),
     supabase.from("mascotas").select("*", { count: "exact", head: true }),
     supabase.from("citas").select("estado"),
-    supabase.from("citas")
-      .select("*, mascotas(nombre, especie), veterinarios(usuarios(nombre, apellido))")
+    supabase
+      .from("citas")
+      .select(
+        "*, mascotas(nombre, especie), veterinarios(usuarios(nombre, apellido))",
+      )
       .eq("fecha", hoy)
       .neq("estado", "cancelada")
       .order("hora", { ascending: true })
@@ -48,10 +62,12 @@ export async function GET() {
   (citas_raw ?? []).forEach((c: { estado: string }) => {
     estadoCounts[c.estado] = (estadoCounts[c.estado] ?? 0) + 1;
   });
-  const citas_por_estado = Object.entries(estadoCounts).map(([estado, cantidad]) => ({
-    estado,
-    cantidad,
-  }));
+  const citas_por_estado = Object.entries(estadoCounts).map(
+    ([estado, cantidad]) => ({
+      estado,
+      cantidad,
+    }),
+  );
 
   return NextResponse.json({
     citas_hoy: citas_hoy ?? 0,

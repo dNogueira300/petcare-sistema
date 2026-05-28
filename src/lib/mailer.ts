@@ -21,6 +21,7 @@ export interface RecordatorioParams {
   hora: string; // "HH:MM"
   nombreVeterinario: string;
   correoCliente: string;
+  idCita?: number; // para el link de confirmación
 }
 
 /* ─── HTML template (sin imágenes base64 → correo < 15 KB) ──────────────── */
@@ -110,19 +111,37 @@ function buildHtml(p: RecordatorioParams): string {
             </td></tr>
           </table>
 
-          <p style="margin:0 0 24px;font-size:13px;color:#4a3d2e;line-height:1.7;">
+          <p style="margin:0 0 20px;font-size:13px;color:#4a3d2e;line-height:1.7;">
             Por favor pres&eacute;ntate con <strong>10 minutos de anticipaci&oacute;n</strong>.
             Si necesitas cancelar o reprogramar, hazlo desde tu portal de cliente.
           </p>
 
-          <!-- CTA -->
+          <!-- CTA CONFIRMAR -->
+          <table cellpadding="0" cellspacing="0" width="100%"
+            style="margin-bottom:14px;">
+            <tr><td align="center">
+              <a href="${APP_URL}/portal?confirmar=${p.idCita ?? ''}"
+                style="display:inline-block;background:#2d6a4f;color:#ffffff;
+                  text-decoration:none;font-size:14px;font-weight:700;
+                  padding:13px 32px;border-radius:9px;letter-spacing:0.02em;">
+                &#x2705; Confirmar mi asistencia
+              </a>
+            </td></tr>
+          </table>
+          <p style="margin:0 0 20px;font-size:11px;color:#8a7a60;text-align:center;line-height:1.5;">
+            Si ya est&aacute;s confirmado, ignora este bot&oacute;n.<br/>
+            Tambi&eacute;n puedes confirmar directamente al llegar a la cl&iacute;nica.
+          </p>
+
+          <!-- CTA VER PORTAL -->
           <table cellpadding="0" cellspacing="0" width="100%"
             style="margin-bottom:28px;">
             <tr><td align="center">
               <a href="${APP_URL}/portal"
-                style="display:inline-block;background:#2d6a4f;color:#ffffff;
-                  text-decoration:none;font-size:14px;font-weight:700;
-                  padding:13px 32px;border-radius:9px;letter-spacing:0.02em;">
+                style="display:inline-block;background:transparent;color:#2d6a4f;
+                  text-decoration:none;font-size:13px;font-weight:600;
+                  padding:9px 24px;border-radius:9px;letter-spacing:0.02em;
+                  border:1.5px solid #2d6a4f;">
                 Ver mis citas en el portal &#x2192;
               </a>
             </td></tr>
