@@ -146,13 +146,7 @@ export default function ColaEsperaPage() {
     <div className="flex flex-col gap-6">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h1
-            className="text-2xl font-bold text-gray-900"
-            style={{
-              fontFamily: "var(--font-dm-sans)",
-              letterSpacing: "-0.02em",
-            }}
-          >
+          <h1 className="text-2xl font-bold text-gray-900" style={{ fontFamily: "var(--font-display)", letterSpacing: "-0.02em" }}>
             Cola de Espera
           </h1>
           <p

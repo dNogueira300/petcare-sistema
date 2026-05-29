@@ -35,7 +35,7 @@ export default function NuevaCitaPage() {
           <ArrowLeft className="size-5" />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Nueva cita</h1>
+          <h1 className="text-2xl font-bold text-gray-900" style={{ fontFamily: "var(--font-display)", letterSpacing: "-0.02em" }}>Nueva cita</h1>
           <p className="text-sm text-gray-500">Agenda una consulta veterinaria</p>
         </div>
       </div>

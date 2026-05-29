@@ -372,7 +372,7 @@ export default function HistoriaClinicaPage() {
     <div className="flex flex-col gap-4 sm:gap-6">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900" style={{ fontFamily: "var(--font-display)", letterSpacing: "-0.02em" }}>
             Historia Clínica
           </h1>
           <p className="text-sm text-gray-500">
@@ -506,7 +506,11 @@ export default function HistoriaClinicaPage() {
                 />
               </div>
               <div style={{ flex:"1 1 200px" }}>
-                <AuditoriaTimeline id_historia={detailItem.id_historia} />
+                <AuditoriaTimeline
+                  id_historia={detailItem.id_historia}
+                  isAdmin={user?.rol === "administrador"}
+                  mascotaNombre={detailItem.mascotas?.nombre}
+                />
               </div>
             </div>
           </div>

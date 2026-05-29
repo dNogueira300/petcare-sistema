@@ -695,7 +695,7 @@ export default function TriajePage() {
               fontSize: "1.5rem",
               fontWeight: 800,
               color: "#111827",
-              fontFamily: "var(--font-dm-sans)",
+              fontFamily: "var(--font-display)",
               letterSpacing: "-0.02em",
             }}
           >

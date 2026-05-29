@@ -312,7 +312,7 @@ export default function CitasPage() {
     <div className="flex flex-col gap-4 sm:gap-6">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Citas</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900" style={{ fontFamily: "var(--font-display)", letterSpacing: "-0.02em" }}>Citas</h1>
           <p className="text-sm text-gray-500">Agenda de consultas veterinarias</p>
         </div>
         <Button onClick={() => setCreateOpen(true)}>

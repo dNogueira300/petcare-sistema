@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { History, User, Plus, Edit3, AlertCircle } from "lucide-react";
+import { History, User, Plus, Edit3, AlertCircle, FileDown } from "lucide-react";
 import { formatLima } from "@/utils/datetime";
 import type { AuditoriaHistoriaClinica } from "@/types";
 
 interface Props {
   id_historia: number;
+  isAdmin?: boolean;
+  mascotaNombre?: string;
 }
 
 const ROL_LABELS: Record<string, string> = {
@@ -43,7 +45,7 @@ function DiffRow({
   );
 }
 
-export function AuditoriaTimeline({ id_historia }: Props) {
+export function AuditoriaTimeline({ id_historia, isAdmin = false, mascotaNombre }: Props) {
   const [entradas, setEntradas] = useState<AuditoriaHistoriaClinica[]>([]);
   const [fetched, setFetched] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -124,27 +126,30 @@ export function AuditoriaTimeline({ id_historia }: Props) {
           }}
         >
           {/* Header */}
-          <div
-            style={{
-              padding: "10px 14px",
-              borderBottom: "1px solid #f3f4f6",
-              background: "#f9fafb",
-              display: "flex",
-              alignItems: "center",
-              gap: 7,
-            }}
-          >
-            <History size={13} style={{ color: "#3d845b" }} />
-            <span
-              style={{
-                fontSize: "0.78rem",
-                fontWeight: 700,
-                color: "#374151",
-                fontFamily: "var(--font-dm-sans)",
-              }}
-            >
+          <div style={{ padding:"10px 14px", borderBottom:"1px solid #f3f4f6", background:"#f9fafb", display:"flex", alignItems:"center", gap:7 }}>
+            <History size={13} style={{ color:"#3d845b" }} />
+            <span style={{ fontSize:"0.78rem", fontWeight:700, color:"#374151", fontFamily:"var(--font-dm-sans)", flex:1 }}>
               Historial de cambios
             </span>
+            {/* Botón exportar PDF — solo admin y cuando hay datos */}
+            {isAdmin && entradas.length > 0 && (
+              <button
+                onClick={async () => {
+                  const { exportAuditoriaPdf } = await import("@/utils/auditoriaPdf");
+                  await exportAuditoriaPdf(
+                    entradas,
+                    { mascota: mascotaNombre },
+                    mascotaNombre ? `Auditoría HC — ${mascotaNombre}` : "Auditoría de Historia Clínica",
+                  );
+                }}
+                title="Exportar auditoría en PDF"
+                style={{ display:"flex", alignItems:"center", gap:5, padding:"4px 10px", borderRadius:6, border:"1px solid #bfdbfe", background:"rgba(239,246,255,0.8)", color:"#1d4ed8", fontSize:"0.7rem", fontWeight:600, fontFamily:"var(--font-dm-sans)", cursor:"pointer", transition:"opacity 0.12s" }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = "0.75"; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = "1"; }}
+              >
+                <FileDown size={11} /> PDF
+              </button>
+            )}
           </div>
 
           {/* Contenido */}

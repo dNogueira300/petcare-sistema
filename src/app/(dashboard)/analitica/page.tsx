@@ -247,7 +247,7 @@ export default function AnaliticaPage() {
       {/* Header */}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: "1.5rem", fontWeight: 800, color: "#111827", fontFamily: "var(--font-dm-sans)", letterSpacing: "-0.02em" }}>
+          <h1 style={{ margin: 0, fontSize: "1.5rem", fontWeight: 800, color: "#111827" }}>
             Analítica Operacional
           </h1>
           <p style={{ margin: "3px 0 0", fontSize: "0.82rem", color: "#6b7280", fontFamily: "var(--font-dm-sans)" }}>

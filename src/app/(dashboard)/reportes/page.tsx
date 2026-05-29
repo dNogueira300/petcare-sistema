@@ -1,417 +1,545 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Users, PawPrint, CalendarDays, TrendingUp, Filter, FileDown } from "lucide-react";
+import {
+  BarChart3, FileText, FileSearch, FileDown, RefreshCw,
+  Calendar, ShieldX, TrendingUp, Users, CheckCircle2, XCircle,
+  Clock, Syringe, AlertTriangle, BarChart2, CalendarDays,
+} from "lucide-react";
+import {
+  Chart as ChartJS, CategoryScale, LinearScale, BarElement,
+  ArcElement, PointElement, LineElement, Title, Tooltip, Legend,
+} from "chart.js";
+import { Bar, Pie, Doughnut } from "react-chartjs-2";
 import { Badge } from "@/components/ui/badge";
 import { PageLoading } from "@/components/ui/loading";
 import { formatLima } from "@/utils/datetime";
 import type { ReportData, VetOption } from "@/types/reportes";
+import { useAuth } from "@/hooks/useAuth";
 
-const estadoLabels: Record<string, string> = { pendiente:"Pendiente", confirmada:"Confirmada", cancelada:"Cancelada", atendida:"Atendida" };
-const estadoColors: Record<string, string>  = { pendiente:"#f59e0b", confirmada:"#22c55e", cancelada:"#f43f5e", atendida:"#3b82f6" };
+ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, PointElement, LineElement, Title, Tooltip, Legend);
 
-/* ═══ Bar chart component ═══ */
-function BarChart({ data, maxVal, color = "#3d845b" }: { data: {label:string; value:number}[]; maxVal: number; color?: string }) {
-  return (
-    <div style={{ display:"flex", flexDirection:"column", gap:"8px" }}>
-      {data.map(({ label, value }) => (
-        <div key={label} style={{ display:"flex", alignItems:"center", gap:"12px" }}>
-          <span style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.78rem", color:"#6b5c44", width:"90px",
-            flexShrink:0, textAlign:"right", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
-            {label}
-          </span>
-          <div style={{ flex:1, height:"22px", background:"#f0ead8", borderRadius:"4px", overflow:"hidden" }}>
-            <div style={{ width: maxVal > 0 ? `${(value/maxVal)*100}%` : "0%", height:"100%",
-              background: color, borderRadius:"4px", transition:"width 0.6s cubic-bezier(0.16,1,0.3,1)",
-              display:"flex", alignItems:"center", justifyContent:"flex-end", paddingRight:"6px", minWidth: value>0?"24px":"0" }}>
-              {value > 0 && <span style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.7rem", fontWeight:700, color:"#fff" }}>{value}</span>}
-            </div>
-          </div>
-          {value === 0 && <span style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.78rem", color:"#c4b89c" }}>0</span>}
-        </div>
-      ))}
-    </div>
-  );
+// ── Tipos ─────────────────────────────────────────────────────────────────────
+type Periodo  = "dia" | "semana" | "mes" | "anio";
+type ActiveTab = "analitica" | "auditoria";
+
+interface AnaliticaData {
+  kpis: { total_citas:number; citas_atendidas:number; citas_canceladas:number; tasa_cancelacion:number; tasa_atencion:number; total_vacunas:number; total_historias:number; nuevas_mascotas:number; seguimientos_pendientes:number; alertas_vacunas_activas:number; atenciones_activas:number };
+  por_estado: { pendiente:number; confirmada:number; cancelada:number; atendida:number };
+  por_veterinario: { nombre:string; total:number; atendidas:number; canceladas:number }[];
+  por_especie: { especie:string; cantidad:number }[];
+  por_dia: { dia:string; cantidad:number }[];
+  evolucion_semanal: { semana:string; total:number; atendidas:number; canceladas:number }[];
+  triajes_por_urgencia: { normal:number; urgente:number; emergencia:number };
+  seguimientos_por_estado: { pendiente:number; sugerencia_enviada:number; completado:number; no_presentado:number };
 }
 
-/* ═══ Stat card ═══ */
-function StatCard({ icon: Icon, label, value, accent, accentBg }: { icon: React.ElementType; label: string; value: number | string; accent: string; accentBg: string }) {
+type AudRow = {
+  id_auditoria: number; id_historia: number;
+  tipo_cambio: "INSERT" | "UPDATE"; timestamp_cambio: string;
+  diagnostico_anterior?:string|null; diagnostico_nuevo?:string|null;
+  tratamiento_anterior?:string|null;  tratamiento_nuevo?:string|null;
+  observaciones_anterior?:string|null; observaciones_nuevo?:string|null;
+  peso_anterior?:number|null; peso_nuevo?:number|null; razon_cambio?:string|null;
+  usuarios?: { nombre:string; apellido:string; rol:string } | null;
+  historia_clinica?: { fecha_consulta?:string; mascotas?:{nombre:string;especie:string}|null; veterinarios?:{usuarios?:{nombre:string;apellido:string}}|null } | null;
+};
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function periodoToRange(p: Periodo): { desde: string; hasta: string } {
+  const hoy = new Date();
+  const fmt = (d: Date) => d.toISOString().slice(0, 10);
+  const hasta = fmt(hoy);
+  if (p === "dia")    return { desde: hasta, hasta };
+  if (p === "semana") { const d = new Date(hoy); d.setDate(hoy.getDate()-6); return { desde: fmt(d), hasta }; }
+  if (p === "anio")   { const d = new Date(hoy); d.setFullYear(hoy.getFullYear()-1); return { desde: fmt(d), hasta }; }
+  return { desde: `${hasta.slice(0,7)}-01`, hasta }; // mes
+}
+
+function periodoToApiParam(p: Periodo): string {
+  return p === "anio" ? "anio" : p === "semana" ? "mes" : p === "dia" ? "mes" : "mes";
+}
+
+const FONT = "var(--font-dm-sans)";
+const tooltipCfg = { backgroundColor:"#fff", borderColor:"#e5e7eb", borderWidth:1, titleColor:"#111827", bodyColor:"#6b7280", titleFont:{family:FONT,weight:700 as const,size:12}, bodyFont:{family:FONT,size:11}, padding:10 };
+const hBarOpts = (max:number) => ({ indexAxis:"y" as const, responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false},tooltip:{...tooltipCfg}}, scales:{ x:{max:Math.ceil(max*1.2)||1, grid:{color:"#f3f4f6"}, ticks:{font:{family:FONT,size:11},color:"#9ca3af"}, border:{display:false}}, y:{grid:{display:false}, ticks:{font:{family:FONT,size:11},color:"#374151"}, border:{display:false}} } });
+const vBarOpts = (stacked=false) => ({ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:"top" as const,labels:{font:{family:FONT,size:11},boxWidth:10,boxHeight:10,padding:14}},tooltip:{...tooltipCfg}}, scales:{ x:{stacked, grid:{display:false}, ticks:{font:{family:FONT,size:10},color:"#374151"}, border:{display:false}}, y:{stacked, grid:{color:"#f3f4f6"}, ticks:{font:{family:FONT,size:11},color:"#9ca3af"}, border:{display:false}} } });
+const arcOpts = (cutout="0%") => ({ responsive:true, maintainAspectRatio:false, cutout, plugins:{legend:{position:"right" as const,labels:{font:{family:FONT,size:11},boxWidth:10,boxHeight:10,padding:10}},tooltip:{...tooltipCfg}} });
+
+function KpiCard({ label, value, icon:Icon, color, suffix="", sub }: { label:string; value:number|string; icon:React.ElementType; color:string; suffix?:string; sub?:string }) {
   return (
-    <div style={{ background:"var(--card-bg)", border:"1px solid var(--card-border)", borderRadius:"12px",
-      padding:"20px", boxShadow:"0 1px 3px rgba(26,18,8,0.06)", display:"flex", alignItems:"center", gap:"16px" }}>
-      <div style={{ width:"44px", height:"44px", borderRadius:"11px", background:accentBg,
-        display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-        <Icon style={{ width:"20px", height:"20px", color:accent }} />
-      </div>
+    <div style={{ background:"#fff", border:"1px solid #e8f0eb", borderRadius:12, padding:"14px 16px", display:"flex", flexDirection:"column", gap:8, boxShadow:"0 1px 4px rgba(0,0,0,0.05)" }}>
+      <div style={{ width:32,height:32,borderRadius:8,background:`${color}15`,display:"flex",alignItems:"center",justifyContent:"center" }}><Icon size={15} style={{color}} /></div>
       <div>
-        <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.72rem", fontWeight:600, letterSpacing:"0.06em",
-          textTransform:"uppercase", color:"#8a7a60", margin:0 }}>{label}</p>
-        <p style={{ fontFamily:"var(--font-fraunces)", fontSize:"1.75rem", fontWeight:700, color:"#1a1208",
-          lineHeight:1.1, margin:0 }}>{value}</p>
+        <p style={{ margin:0, fontSize:"1.5rem", fontWeight:800, color:"#111827", fontFamily:FONT, letterSpacing:"-0.03em", lineHeight:1 }}>
+          {typeof value === "number" ? value.toLocaleString() : value}
+          {suffix && <span style={{ fontSize:"0.95rem", fontWeight:600, color, marginLeft:2 }}>{suffix}</span>}
+        </p>
+        <p style={{ margin:"3px 0 0", fontSize:"0.72rem", color:"#6b7280", fontFamily:FONT }}>{label}</p>
+        {sub && <p style={{ margin:"1px 0 0", fontSize:"0.68rem", color:"#9ca3af", fontFamily:FONT }}>{sub}</p>}
       </div>
     </div>
   );
 }
 
-/* ═══ Page ═══ */
-export default function ReportesPage() {
-  const today = new Date().toISOString().slice(0,10);
-  const firstOfMonth = `${today.slice(0,7)}-01`;
+function ChartCard({ title, children, h=220 }: { title:string; children:React.ReactNode; h?:number }) {
+  return (
+    <div style={{ background:"#fff", border:"1px solid #e8f0eb", borderRadius:14, padding:"18px 20px", boxShadow:"0 1px 4px rgba(0,0,0,0.04)" }}>
+      <p style={{ margin:"0 0 16px", fontSize:"0.76rem", fontWeight:700, color:"#374151", fontFamily:FONT, textTransform:"uppercase", letterSpacing:"0.07em" }}>{title}</p>
+      <div style={{ height:h }}>{children}</div>
+    </div>
+  );
+}
 
-  const [filters, setFilters] = useState<{ desde:string; hasta:string; estado:string; id_veterinario:string }>({ desde:firstOfMonth, hasta:today, estado:"", id_veterinario:"" });
-  const [pdfLoading, setPdfLoading] = useState(false);
-  const [data, setData] = useState<ReportData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [vets, setVets] = useState<VetOption[]>([]);
-  const [citaPage, setCitaPage] = useState(1);
-  const PAGE_SIZE = 10;
+function Skeleton({ h=120 }: { h?:number }) {
+  return <div style={{ height:h, borderRadius:12, background:"linear-gradient(90deg,#f3f4f6,#e8f0eb,#f3f4f6)", backgroundSize:"200% 100%", animation:"shimmer 1.5s infinite" }} />;
+}
 
-  useEffect(() => {
-    fetch("/api/veterinarios").then(r=>r.json()).then(j=>setVets(j.data ?? []));
-  }, []);
+// ── Comparativa mes a mes (Flujo B) ─────────────────────────────────────────
+function ComparativaPanel({ vets }: { vets: VetOption[] }) {
+  const [mesA, setMesA] = useState(() => { const hoy=new Date(); return `${hoy.getFullYear()}-${String(hoy.getMonth()).padStart(2,"0")}`; });
+  const [mesB, setMesB] = useState(() => { const hoy=new Date(); return `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,"0")}`; });
+  const [dataA, setDataA] = useState<ReportData|null>(null);
+  const [dataB, setDataB] = useState<ReportData|null>(null);
+  const [loading, setLoading] = useState(false);
+  const [idVet, setIdVet] = useState("");
 
-  const loadData = useCallback(async () => {
+  const comparar = () => {
     setLoading(true);
-    const p = new URLSearchParams({ desde:filters.desde, hasta:filters.hasta });
-    if (filters.estado) p.set("estado", filters.estado);
-    if (filters.id_veterinario) p.set("id_veterinario", filters.id_veterinario);
-    const res = await fetch(`/api/reportes?${p}`);
-    const json = await res.json();
-    setData(json);
-    setCitaPage(1);
-    setLoading(false);
-  }, [filters]);
-
-  useEffect(() => { loadData(); }, [loadData]);
-
-  const setFilter = (k: keyof typeof filters, v: string) => setFilters(f => ({ ...f, [k]:v }));
-
-  const handleDescargarPdf = async () => {
-    if (!data) return;
-    setPdfLoading(true);
-    try {
-      const { generarReportePDF } = await import("@/utils/reportePdf");
-      await generarReportePDF(filters, data, vets);
-    } catch (err) {
-      console.error("Error al generar PDF:", err);
-    } finally {
-      setPdfLoading(false);
-    }
+    const buildUrl = (mes:string) => {
+      const [y,m]=mes.split("-").map(Number);
+      const desde=`${y}-${String(m).padStart(2,"0")}-01`;
+      const until=new Date(y,m,0);
+      const hasta=`${until.getFullYear()}-${String(until.getMonth()+1).padStart(2,"0")}-${String(until.getDate()).padStart(2,"0")}`;
+      const p=new URLSearchParams({desde,hasta});
+      if (idVet) p.set("id_veterinario",idVet);
+      return `/api/reportes?${p}`;
+    };
+    Promise.all([fetch(buildUrl(mesA)).then(r=>r.json()), fetch(buildUrl(mesB)).then(r=>r.json())])
+      .then(([jA,jB])=>{ setDataA(jA); setDataB(jB); setLoading(false); });
   };
 
-  if (loading || !data) return <PageLoading />;
-
-  const { resumen, por_veterinario, por_dia, por_especie, citas } = data;
-  const maxVet = Math.max(...por_veterinario.map(v=>v.total), 1);
-  const maxDia = Math.max(...por_dia.map(d=>d.cantidad), 1);
-
-  const pagedCitas = citas.slice((citaPage-1)*PAGE_SIZE, citaPage*PAGE_SIZE);
-  const totalPages = Math.ceil(citas.length / PAGE_SIZE);
+  const kpiDef: {label:string; getValue:(d:ReportData|null)=>number}[] = [
+    {label:"Total citas",     getValue:d=>d?.resumen?.total ?? 0},
+    {label:"Atendidas",       getValue:d=>d?.resumen?.por_estado?.atendida ?? 0},
+    {label:"Canceladas",      getValue:d=>d?.resumen?.por_estado?.cancelada ?? 0},
+    {label:"Pendientes",      getValue:d=>d?.resumen?.por_estado?.pendiente ?? 0},
+  ];
 
   return (
-    <div style={{ display:"flex", flexDirection:"column", gap:"24px" }}>
-      {/* Header */}
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:"12px" }}>
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Reportes</h1>
-          <p className="text-sm text-gray-500">Estadísticas y análisis del sistema</p>
-        </div>
-        <div style={{ display:"flex", gap:"8px", flexWrap:"wrap" }}>
-          <button onClick={loadData} style={{ display:"flex", alignItems:"center", gap:"6px",
-            background:"#0a1a11", color:"#fff", border:"none", cursor:"pointer", padding:"9px 18px",
-            borderRadius:"9px", fontFamily:"var(--font-dm-sans)", fontSize:"0.82rem", fontWeight:600 }}>
-            <TrendingUp size={14} /> Actualizar
-          </button>
-          <button
-            onClick={handleDescargarPdf}
-            disabled={pdfLoading}
-            style={{ display:"flex", alignItems:"center", gap:"6px",
-              background: pdfLoading ? "#3d845b" : "#2d6a4f", color:"#fff",
-              border:"none", cursor: pdfLoading ? "not-allowed" : "pointer",
-              padding:"9px 18px", borderRadius:"9px",
-              fontFamily:"var(--font-dm-sans)", fontSize:"0.82rem", fontWeight:600,
-              opacity: pdfLoading ? 0.75 : 1, transition:"opacity 0.15s" }}>
-            {pdfLoading
-              ? <><span style={{ width:"13px", height:"13px", border:"2px solid rgba(255,255,255,0.3)",
-                  borderTopColor:"#fff", borderRadius:"50%", display:"inline-block",
-                  animation:"spin 0.7s linear infinite" }} /> Generando…</>
-              : <><FileDown size={14} /> Descargar PDF</>
-            }
-          </button>
-        </div>
+    <div style={{ background:"#fff", border:"1px solid #e8f0eb", borderRadius:14, padding:"20px 22px" }}>
+      <h3 style={{ margin:"0 0 16px", fontSize:"0.85rem", fontWeight:700, color:"#374151", fontFamily:FONT }}>Comparativa mes a mes (Flujo B)</h3>
+      <div style={{ display:"flex", gap:12, flexWrap:"wrap", marginBottom:14, alignItems:"flex-end" }}>
+        <div><label style={{ display:"block", fontSize:"0.7rem", fontWeight:700, color:"#6b7280", textTransform:"uppercase", letterSpacing:"0.06em", fontFamily:FONT, marginBottom:5 }}>Período A</label>
+          <input type="month" value={mesA} onChange={e=>setMesA(e.target.value)} style={{ height:36, borderRadius:8, border:"1.5px solid #d1d5db", padding:"0 10px", fontFamily:FONT, fontSize:"0.85rem", outline:"none" }} /></div>
+        <div><label style={{ display:"block", fontSize:"0.7rem", fontWeight:700, color:"#6b7280", textTransform:"uppercase", letterSpacing:"0.06em", fontFamily:FONT, marginBottom:5 }}>Período B</label>
+          <input type="month" value={mesB} onChange={e=>setMesB(e.target.value)} style={{ height:36, borderRadius:8, border:"1.5px solid #d1d5db", padding:"0 10px", fontFamily:FONT, fontSize:"0.85rem", outline:"none" }} /></div>
+        <div><label style={{ display:"block", fontSize:"0.7rem", fontWeight:700, color:"#6b7280", textTransform:"uppercase", letterSpacing:"0.06em", fontFamily:FONT, marginBottom:5 }}>Veterinario (opcional)</label>
+          <select value={idVet} onChange={e=>setIdVet(e.target.value)} style={{ height:36, borderRadius:8, border:"1.5px solid #d1d5db", padding:"0 10px", fontFamily:FONT, fontSize:"0.85rem", outline:"none", minWidth:160 }}>
+            <option value="">Todos</option>
+            {vets.map(v=><option key={v.id_veterinario} value={v.id_veterinario}>{v.usuarios.nombre} {v.usuarios.apellido}</option>)}
+          </select></div>
+        <button onClick={comparar} style={{ height:36, padding:"0 18px", borderRadius:8, border:"none", background:"linear-gradient(135deg,#3d845b,#2d6446)", color:"#fff", fontFamily:FONT, fontSize:"0.82rem", fontWeight:700, cursor:"pointer" }}>
+          {loading ? "Comparando…" : "Comparar →"}
+        </button>
       </div>
-
-      {/* Filters */}
-      <div style={{ background:"var(--card-bg)", border:"1px solid var(--card-border)", borderRadius:"12px", padding:"18px 20px" }}>
-        {/* Header row */}
-        <div style={{ display:"flex", alignItems:"center", gap:"6px", color:"#6b5c44", marginBottom:"14px" }}>
-          <Filter size={14} />
-          <span style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.78rem", fontWeight:600, textTransform:"uppercase", letterSpacing:"0.08em" }}>Filtros</span>
-        </div>
-        {/* Responsive grid: 2 cols on mobile, 4 on desktop */}
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))", gap:"14px", alignItems:"end" }}>
-          {[["desde","Desde","date"], ["hasta","Hasta","date"]].map(([k,l,t])=>(
-            <div key={k}>
-              <label style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.72rem", fontWeight:600, color:"#6b5c44",
-                textTransform:"uppercase", letterSpacing:"0.07em", display:"block", marginBottom:"4px" }}>{l}</label>
-              <input type={t} value={filters[k as keyof typeof filters]}
-                onChange={e=>setFilter(k as keyof typeof filters, e.target.value)}
-                style={{ width:"100%", height:"36px", border:"1.5px solid var(--input-border)", borderRadius:"8px",
-                  padding:"0 10px", fontFamily:"var(--font-dm-sans)", fontSize:"0.82rem",
-                  background:"var(--input-bg)", color:"#1a1208", outline:"none", boxSizing:"border-box" }} />
-            </div>
-          ))}
-          <div>
-            <label style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.72rem", fontWeight:600, color:"#6b5c44",
-              textTransform:"uppercase", letterSpacing:"0.07em", display:"block", marginBottom:"4px" }}>Estado</label>
-            <select value={filters.estado} onChange={e=>setFilter("estado", e.target.value)}
-              style={{ width:"100%", height:"36px", border:"1.5px solid var(--input-border)", borderRadius:"8px",
-                padding:"0 10px", fontFamily:"var(--font-dm-sans)", fontSize:"0.82rem",
-                background:"var(--input-bg)", color:"#1a1208", outline:"none", boxSizing:"border-box" }}>
-              <option value="">Todos los estados</option>
-              {["pendiente","confirmada","cancelada","atendida"].map(e=>(
-                <option key={e} value={e}>{estadoLabels[e]}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.72rem", fontWeight:600, color:"#6b5c44",
-              textTransform:"uppercase", letterSpacing:"0.07em", display:"block", marginBottom:"4px" }}>Veterinario</label>
-            <select value={filters.id_veterinario} onChange={e=>setFilter("id_veterinario", e.target.value)}
-              style={{ width:"100%", height:"36px", border:"1.5px solid var(--input-border)", borderRadius:"8px",
-                padding:"0 10px", fontFamily:"var(--font-dm-sans)", fontSize:"0.82rem",
-                background:"var(--input-bg)", color:"#1a1208", outline:"none", boxSizing:"border-box" }}>
-              <option value="">Todos los veterinarios</option>
-              {vets.map(v=>(
-                <option key={v.id_veterinario} value={v.id_veterinario}>
-                  {v.usuarios.nombre} {v.usuarios.apellido}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* Summary cards */}
-      <div className="metric-carousel">
-        <div className="metric-carousel-item"><StatCard icon={CalendarDays} label="Total citas" value={resumen.total} accent="#c48c34" accentBg="#fdf3dc" /></div>
-        <div className="metric-carousel-item"><StatCard icon={TrendingUp} label="Atendidas" value={resumen.por_estado.atendida ?? 0} accent="#3d845b" accentBg="#f0fdf4" /></div>
-        <div className="metric-carousel-item"><StatCard icon={Users} label="Clientes" value={resumen.total_clientes} accent="#2e6fa8" accentBg="#eff6ff" /></div>
-        <div className="metric-carousel-item"><StatCard icon={PawPrint} label="Mascotas" value={resumen.total_mascotas} accent="#8a5a9a" accentBg="#faf5ff" /></div>
-      </div>
-
-      {/* Charts row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
-
-        {/* Estado de citas */}
-        <div style={{ background:"var(--card-bg)", border:"1px solid var(--card-border)", borderRadius:"12px",
-          padding:"22px", boxShadow:"0 1px 3px rgba(26,18,8,0.06)" }}>
-          <p style={{ fontFamily:"var(--font-fraunces)", fontWeight:600, fontStyle:"italic", fontSize:"1rem",
-            color:"#1a1208", margin:"0 0 20px" }}>Citas por estado</p>
-          <div style={{ display:"flex", flexDirection:"column", gap:"10px" }}>
-            {Object.entries(resumen.por_estado).map(([estado, cantidad]) => {
-              const pct = resumen.total > 0 ? Math.round((cantidad/resumen.total)*100) : 0;
-              return (
-                <div key={estado}>
-                  <div style={{ display:"flex", justifyContent:"space-between", marginBottom:"4px" }}>
-                    <span style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.82rem", color:"#4a3d2e", fontWeight:500 }}>
-                      {estadoLabels[estado]}
-                    </span>
-                    <span style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.82rem", fontWeight:700, color:"#1a1208" }}>
-                      {cantidad} <span style={{ fontWeight:400, color:"#8a7a60" }}>({pct}%)</span>
-                    </span>
-                  </div>
-                  <div style={{ height:"10px", background:"#f0ead8", borderRadius:"99px", overflow:"hidden" }}>
-                    <div style={{ width:`${pct}%`, height:"100%", background:estadoColors[estado] ?? "#3d845b",
-                      borderRadius:"99px", transition:"width 0.7s cubic-bezier(0.16,1,0.3,1)" }} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Por veterinario */}
-        <div style={{ background:"var(--card-bg)", border:"1px solid var(--card-border)", borderRadius:"12px",
-          padding:"22px", boxShadow:"0 1px 3px rgba(26,18,8,0.06)" }}>
-          <p style={{ fontFamily:"var(--font-fraunces)", fontWeight:600, fontStyle:"italic", fontSize:"1rem",
-            color:"#1a1208", margin:"0 0 20px" }}>Citas por veterinario</p>
-          {por_veterinario.length === 0
-            ? <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.85rem", color:"#a89a80" }}>Sin datos</p>
-            : <BarChart data={por_veterinario.map(v=>({ label:v.nombre.split(" ").slice(0,2).join(" "), value:v.total }))} maxVal={maxVet} />
-          }
-        </div>
-
-        {/* Por día de semana */}
-        <div style={{ background:"var(--card-bg)", border:"1px solid var(--card-border)", borderRadius:"12px",
-          padding:"22px", boxShadow:"0 1px 3px rgba(26,18,8,0.06)" }}>
-          <p style={{ fontFamily:"var(--font-fraunces)", fontWeight:600, fontStyle:"italic", fontSize:"1rem",
-            color:"#1a1208", margin:"0 0 20px" }}>Citas por día de semana</p>
-          <BarChart data={por_dia.filter(d=>d.dia!=="Domingo").map(d=>({ label:d.dia, value:d.cantidad }))} maxVal={maxDia} color="#c48c34" />
-        </div>
-
-        {/* Por especie */}
-        <div style={{ background:"var(--card-bg)", border:"1px solid var(--card-border)", borderRadius:"12px",
-          padding:"22px", boxShadow:"0 1px 3px rgba(26,18,8,0.06)" }}>
-          <p style={{ fontFamily:"var(--font-fraunces)", fontWeight:600, fontStyle:"italic", fontSize:"1rem",
-            color:"#1a1208", margin:"0 0 20px" }}>Citas por especie</p>
-          {por_especie.length === 0
-            ? <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.85rem", color:"#a89a80" }}>Sin datos</p>
-            : <BarChart data={por_especie.map(e=>({ label:e.especie, value:e.cantidad }))} maxVal={Math.max(...por_especie.map(e=>e.cantidad), 1)} color="#8a5a9a" />
-          }
-        </div>
-
-        {/* Por origen */}
-        <div className="sm:col-span-2" style={{ background:"var(--card-bg)", border:"1px solid var(--card-border)", borderRadius:"12px",
-          padding:"22px", boxShadow:"0 1px 3px rgba(26,18,8,0.06)" }}>
-          <p style={{ fontFamily:"var(--font-fraunces)", fontWeight:600, fontStyle:"italic", fontSize:"1rem",
-            color:"#1a1208", margin:"0 0 20px" }}>Origen de las citas</p>
-          <div style={{ display:"flex", flexWrap:"wrap", gap:"24px", alignItems:"center" }}>
-            {(data.por_origen ?? []).map((o) => {
-              const pct = data.resumen.total > 0 ? Math.round((o.cantidad / data.resumen.total) * 100) : 0;
-              const color = o.origen.startsWith("Portal") ? "#c48c34" : "#3d845b";
-              const bg    = o.origen.startsWith("Portal") ? "#fdf3dc" : "#f0fdf4";
-              return (
-                <div key={o.origen} style={{ display:"flex", alignItems:"center", gap:"16px",
-                  background:bg, borderRadius:"12px", padding:"16px 24px", flex:"1", minWidth:"220px" }}>
-                  <div style={{ width:"52px", height:"52px", borderRadius:"50%",
-                    background: color + "22", border:`2px solid ${color}40`,
-                    display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                    <span style={{ fontFamily:"var(--font-fraunces)", fontSize:"1.1rem",
-                      fontWeight:700, color }}>{pct}%</span>
-                  </div>
-                  <div>
-                    <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.72rem", fontWeight:700,
-                      textTransform:"uppercase", letterSpacing:"0.08em", color:"#8a7a60", margin:0 }}>
-                      {o.origen}
-                    </p>
-                    <p style={{ fontFamily:"var(--font-fraunces)", fontSize:"1.6rem", fontWeight:700,
-                      color, margin:0, lineHeight:1.1 }}>{o.cantidad}</p>
-                    <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.75rem", color:"#8a7a60", margin:0 }}>
-                      {o.cantidad === 1 ? "cita" : "citas"}
-                    </p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* Vet detail table */}
-      {por_veterinario.length > 0 && (
-        <div style={{ background:"var(--card-bg)", border:"1px solid var(--card-border)", borderRadius:"12px",
-          overflow:"hidden", boxShadow:"0 1px 3px rgba(26,18,8,0.06)" }}>
-          <div style={{ padding:"18px 20px", borderBottom:"1px solid var(--card-border)" }}>
-            <p style={{ fontFamily:"var(--font-fraunces)", fontWeight:600, fontStyle:"italic", fontSize:"1rem",
-              color:"#1a1208", margin:0 }}>Resumen por veterinario</p>
-          </div>
-          <div style={{ overflowX: "auto" }}>
-          <table style={{ width:"100%", borderCollapse:"collapse", fontSize:"0.85rem", minWidth:"500px" }}>
+      {(dataA || dataB) && (
+        <div style={{ overflowX:"auto" }}>
+          <table style={{ width:"100%", borderCollapse:"collapse", fontFamily:FONT }}>
             <thead>
-              <tr style={{ background:"#f9f6f0" }}>
-                {["Veterinario","Total","Atendidas","Canceladas","Tasa de atención"].map(h=>(
-                  <th key={h} style={{ padding:"12px 16px", textAlign:"left", fontFamily:"var(--font-dm-sans)",
-                    fontWeight:600, color:"#6b5c44", fontSize:"0.78rem", textTransform:"uppercase",
-                    letterSpacing:"0.06em", borderBottom:"1px solid var(--card-border)" }}>{h}</th>
-                ))}
+              <tr style={{ background:"#f9fafb" }}>
+                <th style={{ padding:"8px 12px", textAlign:"left", fontSize:"0.72rem", fontWeight:700, color:"#6b7280", textTransform:"uppercase", letterSpacing:"0.06em" }}>Métrica</th>
+                <th style={{ padding:"8px 12px", textAlign:"right", fontSize:"0.72rem", fontWeight:700, color:"#2563eb" }}>{mesA}</th>
+                <th style={{ padding:"8px 12px", textAlign:"right", fontSize:"0.72rem", fontWeight:700, color:"#7c3aed" }}>{mesB}</th>
+                <th style={{ padding:"8px 12px", textAlign:"right", fontSize:"0.72rem", fontWeight:700, color:"#374151" }}>Δ Cambio</th>
               </tr>
             </thead>
             <tbody>
-              {por_veterinario.map((v,i) => {
-                const tasa = v.total > 0 ? Math.round((v.atendidas/v.total)*100) : 0;
+              {kpiDef.map(({label,getValue}) => {
+                const vA=getValue(dataA), vB=getValue(dataB), delta=vB-vA;
                 return (
-                  <tr key={i} style={{ borderBottom:"1px solid #f5f0e8" }}>
-                    <td style={{ padding:"13px 16px", fontFamily:"var(--font-dm-sans)", fontWeight:600, color:"#1a1208" }}>{v.nombre}</td>
-                    <td style={{ padding:"13px 16px", fontFamily:"var(--font-dm-sans)", color:"#1a1208", fontWeight:700 }}>{v.total}</td>
-                    <td style={{ padding:"13px 16px", fontFamily:"var(--font-dm-sans)", color:"#16a34a" }}>{v.atendidas}</td>
-                    <td style={{ padding:"13px 16px", fontFamily:"var(--font-dm-sans)", color:"#dc2626" }}>{v.canceladas}</td>
-                    <td style={{ padding:"13px 16px" }}>
-                      <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
-                        <div style={{ flex:1, height:"6px", background:"#e8e0d0", borderRadius:"99px" }}>
-                          <div style={{ width:`${tasa}%`, height:"100%", background:"#3d845b", borderRadius:"99px" }} />
-                        </div>
-                        <span style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.78rem", fontWeight:600, color:"#3d845b", flexShrink:0 }}>{tasa}%</span>
-                      </div>
+                  <tr key={label} style={{ borderTop:"1px solid #f3f4f6" }}>
+                    <td style={{ padding:"8px 12px", fontSize:"0.82rem", color:"#374151", fontWeight:500 }}>{label}</td>
+                    <td style={{ padding:"8px 12px", fontSize:"0.88rem", fontWeight:700, color:"#2563eb", textAlign:"right" }}>{vA}</td>
+                    <td style={{ padding:"8px 12px", fontSize:"0.88rem", fontWeight:700, color:"#7c3aed", textAlign:"right" }}>{vB}</td>
+                    <td style={{ padding:"8px 12px", textAlign:"right" }}>
+                      <span style={{ fontSize:"0.82rem", fontWeight:700, color: delta>0?"#dc2626":delta<0?"#15803d":"#9ca3af" }}>
+                        {delta>0?"+":""}{delta}
+                      </span>
                     </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
-          </div>
         </div>
       )}
-
-      {/* Citas table */}
-      <div style={{ background:"var(--card-bg)", border:"1px solid var(--card-border)", borderRadius:"12px",
-        overflow:"hidden", boxShadow:"0 1px 3px rgba(26,18,8,0.06)" }}>
-        <div style={{ padding:"18px 20px", borderBottom:"1px solid var(--card-border)", display:"flex",
-          justifyContent:"space-between", alignItems:"center" }}>
-          <p style={{ fontFamily:"var(--font-fraunces)", fontWeight:600, fontStyle:"italic", fontSize:"1rem",
-            color:"#1a1208", margin:0 }}>Detalle de citas</p>
-          <span style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.78rem", color:"#8a7a60" }}>
-            {citas.length} registros
-          </span>
-        </div>
-        <div style={{ overflowX:"auto" }}>
-          <table style={{ width:"100%", borderCollapse:"collapse", fontSize:"0.84rem" }}>
-            <thead>
-              <tr style={{ background:"#f9f6f0" }}>
-                {["Fecha","Hora","Mascota","Propietario","Veterinario","Motivo","Estado"].map(h=>(
-                  <th key={h} style={{ padding:"11px 14px", textAlign:"left", fontFamily:"var(--font-dm-sans)",
-                    fontWeight:600, color:"#6b5c44", fontSize:"0.75rem", textTransform:"uppercase",
-                    letterSpacing:"0.06em", borderBottom:"1px solid var(--card-border)", whiteSpace:"nowrap" }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {pagedCitas.length === 0
-                ? <tr><td colSpan={7} style={{ padding:"40px", textAlign:"center", color:"#a89a80", fontFamily:"var(--font-dm-sans)" }}>Sin resultados para los filtros seleccionados</td></tr>
-                : pagedCitas.map((c) => (
-                  <tr key={c.id_cita} style={{ borderBottom:"1px solid #f5f0e8" }} className="hover:bg-petcare-50/30">
-                    <td style={{ padding:"11px 14px", fontFamily:"var(--font-dm-sans)", color:"#1a1208", whiteSpace:"nowrap" }}>
-                      {formatLima(`${c.fecha}T00:00:00`, "dd/MM/yyyy")}
-                    </td>
-                    <td style={{ padding:"11px 14px", fontFamily:"var(--font-dm-sans)", color:"#1a1208" }}>{c.hora.slice(0,5)}</td>
-                    <td style={{ padding:"11px 14px", fontFamily:"var(--font-dm-sans)", color:"#1a1208" }}>{c.mascotas?.nombre ?? "—"}</td>
-                    <td style={{ padding:"11px 14px", fontFamily:"var(--font-dm-sans)", color:"#6b5c44" }}>
-                      {c.mascotas?.clientes ? `${c.mascotas.clientes.usuarios?.nombre ?? ""} ${c.mascotas.clientes.usuarios?.apellido ?? ""}`.trim() : "—"}
-                    </td>
-                    <td style={{ padding:"11px 14px", fontFamily:"var(--font-dm-sans)", color:"#6b5c44", whiteSpace:"nowrap" }}>
-                      {c.veterinarios ? `${c.veterinarios.usuarios.nombre} ${c.veterinarios.usuarios.apellido}` : "—"}
-                    </td>
-                    <td style={{ padding:"11px 14px", fontFamily:"var(--font-dm-sans)", color:"#1a1208", maxWidth:"180px",
-                      overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }} title={c.motivo}>{c.motivo}</td>
-                    <td style={{ padding:"11px 14px" }}><Badge variant={c.estado}>{estadoLabels[c.estado] ?? c.estado}</Badge></td>
-                  </tr>
-                ))
-              }
-            </tbody>
-          </table>
-        </div>
-        {totalPages > 1 && (
-          <div style={{ padding:"14px 20px", borderTop:"1px solid var(--card-border)", display:"flex",
-            justifyContent:"space-between", alignItems:"center" }}>
-            <span style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.8rem", color:"#8a7a60" }}>
-              Página {citaPage} de {totalPages} · {citas.length} citas
-            </span>
-            <div style={{ display:"flex", gap:"6px" }}>
-              <button onClick={() => setCitaPage(p=>Math.max(1,p-1))} disabled={citaPage<=1}
-                style={{ padding:"6px 12px", borderRadius:"7px", border:"1px solid #e5e7eb",
-                  background: citaPage<=1 ? "#f9fafb" : "#fff", cursor: citaPage<=1 ? "default" : "pointer",
-                  fontFamily:"var(--font-dm-sans)", fontSize:"0.8rem", color: citaPage<=1 ? "#c4b89c" : "#1a1208",
-                  opacity: citaPage<=1 ? 0.5 : 1 }}>← Anterior</button>
-              <button onClick={() => setCitaPage(p=>Math.min(totalPages,p+1))} disabled={citaPage>=totalPages}
-                style={{ padding:"6px 12px", borderRadius:"7px", border:"1px solid #e5e7eb",
-                  background: citaPage>=totalPages ? "#f9fafb" : "#fff", cursor: citaPage>=totalPages ? "default" : "pointer",
-                  fontFamily:"var(--font-dm-sans)", fontSize:"0.8rem", color: citaPage>=totalPages ? "#c4b89c" : "#1a1208",
-                  opacity: citaPage>=totalPages ? 0.5 : 1 }}>Siguiente →</button>
-            </div>
-          </div>
-        )}
-      </div>
-
     </div>
   );
 }
+
+// ── Main page ─────────────────────────────────────────────────────────────────
+export default function ReportesPage() {
+  const { user } = useAuth();
+  const [tab, setTab]           = useState<ActiveTab>("analitica");
+  const [periodo, setPeriodo]   = useState<Periodo>("mes");
+  const [filterVet, setFilterVet] = useState("");
+  const [loading, setLoading]   = useState(true);
+
+  // Datos analítica
+  const [analitica, setAnalitica] = useState<AnaliticaData|null>(null);
+
+  // Datos citas (reportes)
+  const [citas, setCitas]       = useState<ReportData|null>(null);
+  const [citasLoading, setCitasLoading] = useState(false);
+  const [vets, setVets]         = useState<VetOption[]>([]);
+  const [mascotas, setMascotas] = useState<{id_mascota:number;nombre:string;especie:string}[]>([]);
+  const [citaPage, setCitaPage] = useState(1);
+  const PAGE_SIZE = 10;
+
+  // Datos auditoría
+  const [audFiltros, setAudFiltros] = useState({ id_mascota:"", id_veterinario:"", desde:"", hasta:"" });
+  const [audData, setAudData]     = useState<AudRow[]>([]);
+  const [audLoading, setAudLoading] = useState(false);
+  const [audBuscado, setAudBuscado] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  if (user && user.rol !== "administrador") {
+    return (
+      <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", minHeight:"60vh", gap:16 }}>
+        <div style={{ width:56,height:56,borderRadius:"50%",background:"rgba(220,38,38,0.08)",display:"flex",alignItems:"center",justifyContent:"center" }}>
+          <ShieldX size={28} style={{color:"#dc2626"}} />
+        </div>
+        <p style={{ margin:0, fontWeight:700, fontSize:"1rem", color:"#111827", fontFamily:FONT }}>Acceso restringido</p>
+        <p style={{ margin:0, fontSize:"0.85rem", color:"#6b7280", fontFamily:FONT }}>Solo el administrador puede acceder a los reportes.</p>
+      </div>
+    );
+  }
+
+  // ── Carga de catálogos ──────────────────────────────────────────────────────
+  useEffect(() => {
+    Promise.all([
+      fetch("/api/veterinarios").then(r=>r.json()),
+      fetch("/api/mascotas").then(r=>r.json()),
+    ]).then(([jV,jM])=>{ setVets(jV.data??[]); setMascotas(jM.data??[]); });
+  }, []);
+
+  // ── Carga de analítica ──────────────────────────────────────────────────────
+  const loadAnalitica = useCallback(() => {
+    setLoading(true);
+    const apiPeriodo = periodoToApiParam(periodo);
+    const url = `/api/analitica?periodo=${apiPeriodo}`;
+    fetch(url).then(r=>r.json()).then(j=>{ setAnalitica(j); setLoading(false); }).catch(()=>setLoading(false));
+  }, [periodo]);
+
+  useEffect(() => { if (tab==="analitica") loadAnalitica(); }, [tab, loadAnalitica]);
+
+  // ── Carga de citas ──────────────────────────────────────────────────────────
+  const loadCitas = useCallback(() => {
+    setCitasLoading(true);
+    const { desde, hasta } = periodoToRange(periodo);
+    const p = new URLSearchParams({ desde, hasta });
+    if (filterVet) p.set("id_veterinario", filterVet);
+    fetch(`/api/reportes?${p}`).then(r=>r.json()).then(j=>{ setCitas(j); setCitaPage(1); setCitasLoading(false); }).catch(()=>setCitasLoading(false));
+  }, [periodo, filterVet]);
+
+  // loadCitas disponible para exportVetPdf/exportPdfCitas aunque no hay tab de citas
+
+  // ── Buscar auditoría ────────────────────────────────────────────────────────
+  const buscarAuditoria = () => {
+    setAudLoading(true);
+    const p = new URLSearchParams();
+    if (audFiltros.id_mascota)     p.set("id_mascota",    audFiltros.id_mascota);
+    if (audFiltros.id_veterinario) p.set("id_veterinario",audFiltros.id_veterinario);
+    if (audFiltros.desde)          p.set("desde",         audFiltros.desde);
+    if (audFiltros.hasta)          p.set("hasta",         audFiltros.hasta);
+    fetch(`/api/auditoria/historia-clinica?${p}`)
+      .then(r=>r.json()).then(j=>{ setAudData(j.data??[]); setAudBuscado(true); setAudLoading(false); })
+      .catch(()=>setAudLoading(false));
+  };
+
+  // ── Exportar CSV ────────────────────────────────────────────────────────────
+  const exportCSV = () => {
+    if (!analitica) return;
+    const rows = [
+      ["Métrica","Valor"],
+      ["Total citas",String(analitica.kpis.total_citas)],
+      ["Citas atendidas",String(analitica.kpis.citas_atendidas)],
+      ["Citas canceladas",String(analitica.kpis.citas_canceladas)],
+      ["Tasa de atención (%)",String(analitica.kpis.tasa_atencion)],
+      ["Tasa de cancelación (%)",String(analitica.kpis.tasa_cancelacion)],
+      ["Vacunas aplicadas",String(analitica.kpis.total_vacunas)],
+      [], ["Citas por estado",""],
+      ...Object.entries(analitica.por_estado).map(([k,v])=>[k,String(v)]),
+      [], ["Veterinario","Total","Atendidas","Canceladas"],
+      ...analitica.por_veterinario.map(v=>[v.nombre,String(v.total),String(v.atendidas),String(v.canceladas)]),
+    ];
+    const csv = rows.map(r=>r.map(c=>`"${c??""}"`) .join(",")).join("\n");
+    const blob = new Blob(["﻿"+csv], {type:"text/csv;charset=utf-8;"});
+    const url  = URL.createObjectURL(blob);
+    const a    = Object.assign(document.createElement("a"),{href:url,download:`reporte-${periodo}-${new Date().toISOString().slice(0,10)}.csv`});
+    a.click(); URL.revokeObjectURL(url);
+  };
+
+  // ── Exportar PDF general ────────────────────────────────────────────────────
+  const exportPdfCitas = async () => {
+    if (!citas) return;
+    setPdfLoading(true);
+    const { generarReportePDF } = await import("@/utils/reportePdf");
+    const { desde, hasta } = periodoToRange(periodo);
+    await generarReportePDF({ desde, hasta, estado:"", id_veterinario:filterVet }, citas, vets);
+    setPdfLoading(false);
+  };
+
+  // ── Exportar PDF veterinario (Flujo C) ─────────────────────────────────────
+  const exportVetPdf = async () => {
+    if (!filterVet || !citas) return;
+    const vet = vets.find(v=>v.id_veterinario.toString()===filterVet);
+    if (!vet) return;
+    setPdfLoading(true);
+    const { generarReportePDF } = await import("@/utils/reportePdf");
+    const { desde, hasta } = periodoToRange(periodo);
+    await generarReportePDF({ desde, hasta, estado:"", id_veterinario:filterVet }, citas, vets);
+    setPdfLoading(false);
+  };
+
+  // ── Exportar PDF auditoría ──────────────────────────────────────────────────
+  const exportAudPdf = async () => {
+    const { exportAuditoriaPdf } = await import("@/utils/auditoriaPdf");
+    const mascotaN = mascotas.find(m=>m.id_mascota.toString()===audFiltros.id_mascota)?.nombre;
+    const vetObj   = vets.find(v=>v.id_veterinario.toString()===audFiltros.id_veterinario);
+    await exportAuditoriaPdf(audData, { mascota:mascotaN, veterinario:vetObj ? `${vetObj.usuarios.nombre} ${vetObj.usuarios.apellido}`:undefined, desde:audFiltros.desde||undefined, hasta:audFiltros.hasta||undefined });
+  };
+
+  // ── Charts datasets ─────────────────────────────────────────────────────────
+  const A = analitica;
+  const pieEstado = A ? { labels:["Atendidas","Confirmadas","Pendientes","Canceladas"], datasets:[{ data:[A.por_estado.atendida,A.por_estado.confirmada,A.por_estado.pendiente,A.por_estado.cancelada], backgroundColor:["#22c55e","#3b82f6","#f59e0b","#f43f5e"], borderWidth:2, borderColor:"#fff" }] } : null;
+  const donutTriaje = A ? { labels:["Normal","Urgente","Emergencia"], datasets:[{ data:[A.triajes_por_urgencia.normal,A.triajes_por_urgencia.urgente,A.triajes_por_urgencia.emergencia], backgroundColor:["#22c55e","#f59e0b","#ef4444"], borderWidth:2, borderColor:"#fff" }] } : null;
+  const barVet = A ? { labels:A.por_veterinario.slice(0,6).map(v=>v.nombre.split(" ")[0]), datasets:[{label:"Atendidas",data:A.por_veterinario.slice(0,6).map(v=>v.atendidas),backgroundColor:"#22c55e",borderRadius:4},{label:"Canceladas",data:A.por_veterinario.slice(0,6).map(v=>v.canceladas),backgroundColor:"#f43f5e",borderRadius:4}] } : null;
+  const barSemanal = A ? { labels:A.evolucion_semanal.map(s=>s.semana), datasets:[{label:"Total",data:A.evolucion_semanal.map(s=>s.total),backgroundColor:"rgba(61,132,91,0.45)",borderColor:"#3d845b",borderWidth:2,borderRadius:3},{label:"Atendidas",data:A.evolucion_semanal.map(s=>s.atendidas),backgroundColor:"#22c55e",borderRadius:3},{label:"Canceladas",data:A.evolucion_semanal.map(s=>s.canceladas),backgroundColor:"#f43f5e",borderRadius:3}] } : null;
+  const hEspecie = A ? { labels:A.por_especie.slice(0,7).map(e=>e.especie), datasets:[{label:"Citas",data:A.por_especie.slice(0,7).map(e=>e.cantidad),backgroundColor:["#3d845b","#0369a1","#7c3aed","#b45309","#0f766e","#dc2626","#9ca3af"],borderRadius:4}] } : null;
+  const hDia = A ? { labels:A.por_dia.map(d=>d.dia), datasets:[{label:"Citas",data:A.por_dia.map(d=>d.cantidad),backgroundColor:"#3d845b",borderRadius:4}] } : null;
+  const maxEsp = A ? Math.max(...A.por_especie.slice(0,7).map(e=>e.cantidad),1) : 1;
+  const maxDia = A ? Math.max(...A.por_dia.map(d=>d.cantidad),1) : 1;
+
+  const tabBtn = (id:ActiveTab, label:string, Icon:React.ElementType) => (
+    <button onClick={()=>setTab(id)} style={{ display:"flex", alignItems:"center", gap:7, padding:"9px 18px", borderRadius:9, border:"none", cursor:"pointer", fontFamily:FONT, fontSize:"0.85rem", fontWeight:tab===id?700:500, transition:"all 0.15s", background:tab===id?"#0a1a11":"transparent", color:tab===id?"#fff":"#6b5c44" }}>
+      <Icon size={14} /> {label}
+    </button>
+  );
+
+  const PERIODO_OPS: {val:Periodo;label:string}[] = [{val:"dia",label:"Hoy"},{val:"semana",label:"7 días"},{val:"mes",label:"Este mes"},{val:"anio",label:"Este año"}];
+
+  // ── Citas paginadas ─────────────────────────────────────────────────────────
+  const citasList = (citas?.citas ?? []) as { id_cita:number; fecha:string; hora:string; estado:string; mascotas:{ nombre:string;especie:string }|null; veterinarios:{ usuarios:{ nombre:string;apellido:string } }|null }[];
+  const paged   = citasList.slice((citaPage-1)*PAGE_SIZE, citaPage*PAGE_SIZE);
+  const totalPg = Math.ceil(citasList.length / PAGE_SIZE);
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:24 }}>
+
+      {/* ── Header ── */}
+      <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:12, flexWrap:"wrap" }}>
+        <div>
+          <h1 style={{ margin:0, fontSize:"1.5rem", fontWeight:800, color:"#111827" }}>
+            Reportes y Analítica
+          </h1>
+          <p style={{ margin:"3px 0 0", fontSize:"0.82rem", color:"#6b7280", fontFamily:FONT }}>
+            KPIs operacionales, comparativas, citas detalladas y auditoría clínica
+          </p>
+        </div>
+        {/* Selector de período */}
+        <div style={{ display:"flex", border:"1px solid #e5e7eb", borderRadius:9, overflow:"hidden", background:"#fff" }}>
+          {PERIODO_OPS.map(({val,label}) => (
+            <button key={val} onClick={()=>setPeriodo(val)} style={{ padding:"7px 14px", border:"none", cursor:"pointer", fontSize:"0.78rem", fontWeight:600, fontFamily:FONT, background:periodo===val?"rgba(61,132,91,0.1)":"transparent", color:periodo===val?"#15803d":"#6b7280", borderRight:val!=="anio"?"1px solid #e5e7eb":"none", transition:"all 0.12s" }}>
+              <Calendar size={11} style={{ display:"inline", marginRight:4 }} />{label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Tabs ── */}
+      <div style={{ display:"flex", gap:2, background:"#ede7d9", padding:4, borderRadius:12, width:"fit-content" }}>
+        {tabBtn("analitica", "KPIs y Analítica", BarChart3)}
+        {tabBtn("auditoria", "Auditoría Clínica", FileSearch)}
+      </div>
+
+      {/* ══════════ TAB: KPIs y Analítica ══════════ */}
+      {tab === "analitica" && (
+        <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
+          {/* Filtro + Exportar */}
+          <div style={{ display:"flex", gap:10, alignItems:"center", flexWrap:"wrap" }}>
+            <select value={filterVet} onChange={e=>setFilterVet(e.target.value)}
+              style={{ height:36, borderRadius:8, border:"1.5px solid #d1d5db", padding:"0 10px", fontFamily:FONT, fontSize:"0.82rem", outline:"none" }}>
+              <option value="">Todos los veterinarios</option>
+              {vets.map(v=><option key={v.id_veterinario} value={v.id_veterinario}>{v.usuarios.nombre} {v.usuarios.apellido}</option>)}
+            </select>
+            <button onClick={loadAnalitica} style={{ height:36, padding:"0 14px", borderRadius:8, border:"1px solid #d1fae5", background:"rgba(240,253,244,0.7)", color:"#15803d", fontFamily:FONT, fontSize:"0.78rem", fontWeight:600, cursor:"pointer", display:"flex", alignItems:"center", gap:6 }}>
+              <RefreshCw size={13} style={loading?{animation:"spin 1s linear infinite"}:{}} /> Actualizar
+            </button>
+            <div style={{ marginLeft:"auto", display:"flex", gap:8 }}>
+              {A && <button onClick={exportCSV} style={{ height:36, padding:"0 14px", borderRadius:8, border:"1px solid #bfdbfe", background:"rgba(239,246,255,0.9)", color:"#1d4ed8", fontFamily:FONT, fontSize:"0.78rem", fontWeight:600, cursor:"pointer", display:"flex", alignItems:"center", gap:6 }}><FileDown size={13}/> CSV</button>}
+            </div>
+          </div>
+
+          {/* KPI Grid */}
+          {loading ? (
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(170px,1fr))", gap:12 }}>
+              {Array.from({length:11}).map((_,i)=><Skeleton key={i} h={96} />)}
+            </div>
+          ) : A && (
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(170px,1fr))", gap:12 }}>
+              <KpiCard label="Total citas"            value={A.kpis.total_citas}             icon={CalendarDays} color="#3d845b" />
+              <KpiCard label="Citas atendidas"        value={A.kpis.citas_atendidas}         icon={CheckCircle2} color="#15803d" />
+              <KpiCard label="Citas canceladas"       value={A.kpis.citas_canceladas}        icon={XCircle}      color="#dc2626" />
+              <KpiCard label="Tasa de no-presentación" value={A.kpis.tasa_cancelacion}      icon={AlertTriangle} color="#b45309" suffix="%" />
+              <KpiCard label="Tasa de atención"       value={A.kpis.tasa_atencion}           icon={TrendingUp}   color="#0369a1" suffix="%" />
+              <KpiCard label="Vacunas aplicadas"      value={A.kpis.total_vacunas}           icon={Syringe}      color="#7c3aed" />
+              <KpiCard label="Historias clínicas"     value={A.kpis.total_historias}         icon={FileText}     color="#0f766e" />
+              <KpiCard label="Mascotas nuevas"        value={A.kpis.nuevas_mascotas}         icon={Users}        color="#15803d" />
+              <KpiCard label="Seguimientos pendientes" value={A.kpis.seguimientos_pendientes} icon={Clock}        color="#d97706" />
+              <KpiCard label="Vet. más solicitado"   value={A.por_veterinario[0]?.nombre.split(" ")[0] ?? "—"} icon={BarChart2} color="#2563eb"
+                sub={A.por_veterinario[0] ? `${A.por_veterinario[0].total} citas` : undefined} />
+              <KpiCard label="Hora pico"             value={A.por_dia.sort((a,b)=>b.cantidad-a.cantidad)[0]?.dia ?? "—"} icon={Clock} color="#0f766e" />
+            </div>
+          )}
+
+          {/* Charts */}
+          {!loading && A && (
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
+              <ChartCard title="Estado de citas">{pieEstado && <Pie data={pieEstado} options={arcOpts()} />}</ChartCard>
+              <ChartCard title="Evolución semanal">{barSemanal && <Bar data={barSemanal} options={vBarOpts(false)} />}</ChartCard>
+              <ChartCard title="Citas por veterinario (top 6)">{barVet && <Bar data={barVet} options={vBarOpts(true)} />}</ChartCard>
+              <ChartCard title="Triajes por urgencia" h={180}>{donutTriaje && <Doughnut data={donutTriaje} options={arcOpts("60%")} />}</ChartCard>
+              <ChartCard title="Citas por especie" h={Math.max((A.por_especie.slice(0,7).length)*38,140)}>{hEspecie && <Bar data={hEspecie} options={hBarOpts(maxEsp)} />}</ChartCard>
+              <ChartCard title="Citas por día de semana" h={Math.max(A.por_dia.length*38,140)}>{hDia && <Bar data={hDia} options={hBarOpts(maxDia)} />}</ChartCard>
+            </div>
+          )}
+
+          {/* Comparativa (Flujo B) */}
+          {!loading && <ComparativaPanel vets={vets} />}
+        </div>
+      )}
+
+      {/* ══════════ TAB: Auditoría Clínica ══════════ */}
+      {tab === "auditoria" && (
+        <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+          <p style={{ margin:0, fontFamily:FONT, fontSize:"0.88rem", color:"#6b7280" }}>
+            Consulta el historial completo de cambios en historias clínicas: quién modificó qué campo, cuándo y el valor anterior vs. nuevo.
+          </p>
+
+          {/* Filtros */}
+          <div style={{ background:"#fff", border:"1px solid #e5e7eb", borderRadius:14, padding:"18px 20px" }}>
+            <p style={{ margin:"0 0 12px", fontFamily:FONT, fontSize:"0.75rem", fontWeight:700, color:"#374151", textTransform:"uppercase", letterSpacing:"0.07em" }}>Filtros</p>
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))", gap:12, marginBottom:14 }}>
+              <div><label style={{ display:"block", fontFamily:FONT, fontSize:"0.7rem", fontWeight:700, color:"#6b7280", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:5 }}>Mascota</label>
+                <select value={audFiltros.id_mascota} onChange={e=>setAudFiltros(f=>({...f,id_mascota:e.target.value}))} style={{ width:"100%", height:36, borderRadius:8, border:"1.5px solid #d1d5db", padding:"0 10px", fontFamily:FONT, fontSize:"0.82rem", outline:"none" }}>
+                  <option value="">Todas las mascotas</option>
+                  {mascotas.map(m=><option key={m.id_mascota} value={m.id_mascota}>{m.nombre} ({m.especie})</option>)}
+                </select></div>
+              <div><label style={{ display:"block", fontFamily:FONT, fontSize:"0.7rem", fontWeight:700, color:"#6b7280", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:5 }}>Veterinario</label>
+                <select value={audFiltros.id_veterinario} onChange={e=>setAudFiltros(f=>({...f,id_veterinario:e.target.value}))} style={{ width:"100%", height:36, borderRadius:8, border:"1.5px solid #d1d5db", padding:"0 10px", fontFamily:FONT, fontSize:"0.82rem", outline:"none" }}>
+                  <option value="">Todos</option>
+                  {vets.map(v=><option key={v.id_veterinario} value={v.id_veterinario}>{v.usuarios.nombre} {v.usuarios.apellido}</option>)}
+                </select></div>
+              <div><label style={{ display:"block", fontFamily:FONT, fontSize:"0.7rem", fontWeight:700, color:"#6b7280", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:5 }}>Desde</label>
+                <input type="date" value={audFiltros.desde} onChange={e=>setAudFiltros(f=>({...f,desde:e.target.value}))} style={{ width:"100%", height:36, borderRadius:8, border:"1.5px solid #d1d5db", padding:"0 10px", fontFamily:FONT, fontSize:"0.82rem", outline:"none", boxSizing:"border-box" }} /></div>
+              <div><label style={{ display:"block", fontFamily:FONT, fontSize:"0.7rem", fontWeight:700, color:"#6b7280", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:5 }}>Hasta</label>
+                <input type="date" value={audFiltros.hasta} onChange={e=>setAudFiltros(f=>({...f,hasta:e.target.value}))} style={{ width:"100%", height:36, borderRadius:8, border:"1.5px solid #d1d5db", padding:"0 10px", fontFamily:FONT, fontSize:"0.82rem", outline:"none", boxSizing:"border-box" }} /></div>
+            </div>
+            <div style={{ display:"flex", gap:8, justifyContent:"flex-end" }}>
+              {audBuscado && audData.length > 0 && (
+                <button onClick={exportAudPdf} style={{ height:36, padding:"0 14px", borderRadius:8, border:"1px solid #bfdbfe", background:"rgba(239,246,255,0.9)", color:"#1d4ed8", fontFamily:FONT, fontSize:"0.8rem", fontWeight:600, cursor:"pointer", display:"flex", alignItems:"center", gap:5 }}>
+                  <FileDown size={13}/> Exportar PDF
+                </button>
+              )}
+              <button onClick={buscarAuditoria} style={{ height:36, padding:"0 20px", borderRadius:8, border:"none", background:"linear-gradient(135deg,#2d6a4f,#1a3320)", color:"#fff", fontFamily:FONT, fontSize:"0.85rem", fontWeight:700, cursor:"pointer" }}>
+                {audLoading ? "Buscando…" : "Buscar"}
+              </button>
+            </div>
+          </div>
+
+          {/* Timeline */}
+          {audBuscado && (
+            <div style={{ background:"#fff", border:"1px solid #e5e7eb", borderRadius:14, overflow:"hidden" }}>
+              <div style={{ padding:"12px 18px", borderBottom:"1px solid #f3f4f6", background:"#f9fafb", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                <span style={{ fontFamily:FONT, fontSize:"0.78rem", fontWeight:700, color:"#374151" }}>
+                  {audData.length === 0 ? "Sin resultados" : `${audData.length} registro${audData.length!==1?"s":""} encontrado${audData.length!==1?"s":""}`}
+                </span>
+                {audData.length>0 && <span style={{ fontFamily:FONT, fontSize:"0.72rem", color:"#9ca3af" }}>Más recientes primero</span>}
+              </div>
+              {audLoading ? <div style={{ padding:40, textAlign:"center", color:"#9ca3af", fontFamily:FONT }}>Cargando…</div>
+              : audData.length === 0 ? <div style={{ padding:40, textAlign:"center", color:"#9ca3af", fontFamily:FONT }}>No se encontraron registros con los filtros aplicados.</div>
+              : (
+                <div style={{ padding:"16px 18px", display:"flex", flexDirection:"column", gap:12 }}>
+                  {audData.map((e,idx)=>{
+                    const isIns = e.tipo_cambio==="INSERT";
+                    const mascota = e.historia_clinica?.mascotas;
+                    const vetU    = e.historia_clinica?.veterinarios?.usuarios;
+                    const usuario = e.usuarios;
+                    const fechaHC = e.historia_clinica?.fecha_consulta
+                      ? new Date(`${e.historia_clinica.fecha_consulta}T00:00:00`).toLocaleDateString("es-PE",{day:"2-digit",month:"2-digit",year:"numeric"})
+                      : null;
+                    const campos:string[] = [];
+                    if (e.diagnostico_anterior!==e.diagnostico_nuevo&&(e.diagnostico_anterior||e.diagnostico_nuevo)) campos.push("Diagnóstico");
+                    if (e.tratamiento_anterior!==e.tratamiento_nuevo&&(e.tratamiento_anterior||e.tratamiento_nuevo)) campos.push("Tratamiento");
+                    if (e.observaciones_anterior!==e.observaciones_nuevo&&(e.observaciones_anterior||e.observaciones_nuevo)) campos.push("Observaciones");
+                    if (e.peso_anterior!==e.peso_nuevo&&(e.peso_anterior!=null||e.peso_nuevo!=null)) campos.push("Peso");
+                    return (
+                      <div key={e.id_auditoria} style={{ position:"relative", paddingLeft:24 }}>
+                        {idx<audData.length-1 && <div style={{ position:"absolute", left:7, top:18, bottom:-12, width:1, background:"#e5e7eb" }} />}
+                        <div style={{ position:"absolute", left:0, top:4, width:14, height:14, borderRadius:"50%", background:isIns?"#3d845b":"#2563eb", border:"2px solid #fff", boxShadow:"0 0 0 1px #e5e7eb" }} />
+                        <div style={{ background:isIns?"rgba(240,253,244,0.5)":"#fff", border:"1px solid #f3f4f6", borderRadius:10, padding:"12px 14px" }}>
+                          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:10, marginBottom:8, flexWrap:"wrap" }}>
+                            <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                              <span style={{ display:"inline-flex", alignItems:"center", gap:4, padding:"2px 8px", borderRadius:99, background:isIns?"rgba(21,128,61,0.1)":"rgba(37,99,235,0.08)", color:isIns?"#15803d":"#2563eb", fontSize:"0.65rem", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.06em", fontFamily:FONT }}>
+                                {isIns?"Creación":"Modificación"}
+                              </span>
+                              {mascota && <span style={{ fontFamily:FONT, fontSize:"0.8rem", fontWeight:700, color:"#111827" }}>{mascota.nombre} <span style={{ fontWeight:400, color:"#6b7280", textTransform:"capitalize" }}>({mascota.especie})</span></span>}
+                            </div>
+                            <span style={{ fontFamily:FONT, fontSize:"0.72rem", color:"#9ca3af", whiteSpace:"nowrap" }}>
+                              {new Date(e.timestamp_cambio).toLocaleString("es-PE",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"})}
+                            </span>
+                          </div>
+                          <div style={{ display:"flex", gap:14, flexWrap:"wrap", marginBottom:campos.length>0?8:0 }}>
+                            {fechaHC && <span style={{ fontFamily:FONT, fontSize:"0.75rem", color:"#6b7280" }}>HC del {fechaHC}</span>}
+                            {vetU    && <span style={{ fontFamily:FONT, fontSize:"0.75rem", color:"#6b7280" }}>Vet: {vetU.nombre} {vetU.apellido}</span>}
+                            {usuario && <span style={{ fontFamily:FONT, fontSize:"0.75rem", color:"#374151", fontWeight:600 }}>Por: {usuario.nombre} {usuario.apellido}</span>}
+                            {e.razon_cambio && <span style={{ fontFamily:FONT, fontSize:"0.73rem", color:"#6b7280", fontStyle:"italic" }}>"{e.razon_cambio}"</span>}
+                          </div>
+                          {campos.length>0 && (
+                            <div style={{ display:"flex", flexDirection:"column", gap:6, borderTop:"1px solid #f3f4f6", paddingTop:8 }}>
+                              {(["diagnostico","tratamiento","observaciones","peso"] as const).map(campo=>{
+                                const label = {diagnostico:"Diagnóstico",tratamiento:"Tratamiento",observaciones:"Observaciones",peso:"Peso"}[campo];
+                                const ant = e[`${campo}_anterior` as keyof AudRow] as string|null|undefined;
+                                const nvo = e[`${campo}_nuevo`    as keyof AudRow] as string|null|undefined;
+                                if ((!ant&&!nvo)||ant===nvo) return null;
+                                return (
+                                  <div key={campo} style={{ fontFamily:FONT, fontSize:"0.76rem" }}>
+                                    <span style={{ fontWeight:600, color:"#374151" }}>{label}: </span>
+                                    {ant && <span style={{ background:"rgba(239,68,68,0.08)", color:"#dc2626", padding:"1px 5px", borderRadius:4, textDecoration:"line-through", marginRight:5 }}>{String(ant).slice(0,100)}{String(ant).length>100?"…":""}</span>}
+                                    {nvo && <span style={{ background:"rgba(21,128,61,0.08)", color:"#15803d", padding:"1px 5px", borderRadius:4 }}>{String(nvo).slice(0,100)}{String(nvo).length>100?"…":""}</span>}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      <style>{`
+        @keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+        @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+      `}</style>
+    </div>
+  );
+}
+

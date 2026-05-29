@@ -225,7 +225,7 @@ export default function ClientesPage() {
     <div className="flex flex-col gap-4 sm:gap-6">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Clientes</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900" style={{ fontFamily: "var(--font-display)", letterSpacing: "-0.02em" }}>Clientes</h1>
           <p className="text-sm text-gray-500">Propietarios de mascotas registrados</p>
         </div>
         <Button onClick={() => setCreateOpen(true)}>

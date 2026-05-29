@@ -108,14 +108,7 @@ const navItems: NavItem[] = [
       { href: "/recursos", label: "Recursos", module: "recursos" },
     ],
   },
-  {
-    icon: BarChart2,
-    label: "Reportes",
-    children: [
-      { href: "/reportes", label: "Reportes", module: "reportes" },
-      { href: "/analitica", label: "Analítica", module: "analitica" },
-    ],
-  },
+  { href: "/reportes", icon: BarChart2, label: "Reportes", module: "reportes" },
 ];
 
 interface SidebarProps {

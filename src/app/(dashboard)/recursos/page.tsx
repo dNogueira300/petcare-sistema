@@ -118,7 +118,7 @@ export default function RecursosPage() {
       {/* Header */}
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900" style={{ fontFamily:"var(--font-dm-sans)", letterSpacing:"-0.02em" }}>
+          <h1 className="text-2xl font-bold text-gray-900" style={{ fontFamily: "var(--font-display)", letterSpacing: "-0.02em" }}>
             Recursos Clínicos
           </h1>
           <p className="text-sm text-gray-500 mt-0.5" style={{ fontFamily:"var(--font-dm-sans)" }}>

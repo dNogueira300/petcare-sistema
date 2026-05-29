@@ -83,8 +83,8 @@ body {
   line-height: 1.6;
 }
 
-/* ── Display headings use Fraunces ── */
-h1, h2, h3, .font-display {
+/* ── Headings use Fraunces (consistent across all modules) ── */
+h1, h2, h3, h4, h5, h6, .font-display {
   font-family: var(--font-display);
   letter-spacing: -0.02em;
 }

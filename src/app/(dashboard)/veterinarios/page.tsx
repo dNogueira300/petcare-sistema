@@ -52,7 +52,7 @@ export default function VeterinariosPage() {
           <Stethoscope className="size-5" />
         </div>
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Veterinarios</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900" style={{ fontFamily: "var(--font-display)", letterSpacing: "-0.02em" }}>Veterinarios</h1>
           <p className="text-sm text-gray-500">Equipo médico y sus horarios de atención semanales</p>
         </div>
       </div>
