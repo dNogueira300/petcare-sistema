@@ -77,11 +77,11 @@ export function ProfileModal({ open, onClose }: { open: boolean; onClose: () => 
             <button onClick={()=>{ setView("password"); setError(null); setSavedMsg(null); }} style={tabBtnS(view==="password")}><KeyRound size={13}/> Contraseña</button>
           </div>
         </div>
-        <div style={{ padding:"16px 24px 24px", overflowY:"auto" }}>
+        <div style={{ flex:1, minHeight:0, overflowY:"auto", padding:"16px 24px 24px" }}>
           {loading ? <div style={{ textAlign:"center", padding:"40px 0", color:"#8a7a60", fontFamily:"var(--font-dm-sans)", fontSize:"0.88rem" }}>Cargando…</div>
           : view === "datos" ? (
             <form onSubmit={handleSaveDatos} style={{ display:"flex", flexDirection:"column", gap:"14px" }}>
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px" }}><div><label style={labelS}>Nombre</label><input value={profile?.usuarios.nombre??""} readOnly style={readS} /></div><div><label style={labelS}>Apellido</label><input value={profile?.usuarios.apellido??""} readOnly style={readS} /></div></div>
+              <div className="portal-form-grid"><div><label style={labelS}>Nombre</label><input value={profile?.usuarios.nombre??""} readOnly style={readS} /></div><div><label style={labelS}>Apellido</label><input value={profile?.usuarios.apellido??""} readOnly style={readS} /></div></div>
               <div><label style={labelS}>Correo</label><input value={profile?.usuarios.correo??""} readOnly style={readS} /><p style={{ fontSize:"0.72rem", color:"#a89a80", fontFamily:"var(--font-dm-sans)", margin:"4px 0 0" }}>Para cambiar el nombre o correo, contacta con recepción.</p></div>
               <div><label style={labelS}>Teléfono</label><input value={telefono} onChange={e=>setTelefono(e.target.value)} required style={inputS} placeholder="Ej: 987654321" /></div>
               <div><label style={labelS}>Dirección (opcional)</label><input value={direccion} onChange={e=>setDireccion(e.target.value)} style={inputS} placeholder="Ej: Av. Larco 123" /></div>

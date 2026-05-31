@@ -211,8 +211,8 @@ export default function PortalPage() {
           <Link href="/" style={{ display:"flex", alignItems:"center" }}>
             <Image src="/logo/logo_h.png" alt="PetCare" width={100} height={28} style={{ height:"auto", filter:"brightness(0) invert(1)", opacity:0.9 }} />
           </Link>
-          <div style={{ width:"1px", height:"20px", background:"rgba(255,255,255,0.15)" }} />
-          <span style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.82rem", color:"rgba(255,255,255,0.55)" }}>Mi Portal</span>
+          <div className="hidden sm:block" style={{ width:"1px", height:"20px", background:"rgba(255,255,255,0.15)" }} />
+          <span className="hidden sm:block" style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.82rem", color:"rgba(255,255,255,0.55)" }}>Mi Portal</span>
         </div>
         <div style={{ display:"flex", alignItems:"center", gap:"12px" }}>
           <button onClick={() => setProfileOpen(true)} title="Mi perfil"
@@ -226,7 +226,7 @@ export default function PortalPage() {
               {user?.nombre} {user?.apellido}
             </span>
           </button>
-          <Link href="/" style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.78rem", color:"rgba(255,255,255,0.45)", textDecoration:"none", padding:"6px 10px", borderRadius:"7px", border:"1px solid rgba(255,255,255,0.1)", transition:"all 0.15s" }}
+          <Link href="/" className="hidden sm:flex" style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.78rem", color:"rgba(255,255,255,0.45)", textDecoration:"none", padding:"6px 10px", borderRadius:"7px", border:"1px solid rgba(255,255,255,0.1)", transition:"all 0.15s" }}
             onMouseEnter={e=>{(e.currentTarget as HTMLAnchorElement).style.color="rgba(255,255,255,0.8)";}}
             onMouseLeave={e=>{(e.currentTarget as HTMLAnchorElement).style.color="rgba(255,255,255,0.45)";}}>
             Inicio
@@ -235,14 +235,14 @@ export default function PortalPage() {
             style={{ background:"rgba(255,255,255,0.08)", border:"1px solid rgba(255,255,255,0.15)", color:"rgba(255,255,255,0.7)", cursor:"pointer", padding:"6px 12px", borderRadius:"7px", fontFamily:"var(--font-dm-sans)", fontSize:"0.78rem", display:"flex", alignItems:"center", gap:"6px", transition:"all 0.15s" }}
             onMouseEnter={e=>{const b=e.currentTarget as HTMLButtonElement;b.style.background="rgba(255,255,255,0.14)";b.style.color="#fff";}}
             onMouseLeave={e=>{const b=e.currentTarget as HTMLButtonElement;b.style.background="rgba(255,255,255,0.08)";b.style.color="rgba(255,255,255,0.7)";}}>
-            <LogOut size={13} /> Cerrar sesión
+            <LogOut size={13} /><span className="hidden sm:inline"> Cerrar sesión</span>
           </button>
         </div>
       </header>
 
       {/* ── MAIN — layout dos columnas ── */}
       <main style={{ maxWidth:"1200px", margin:"0 auto", padding:"24px clamp(12px,3vw,32px)" }}>
-        <div style={{ display:"flex", gap:20, alignItems:"flex-start" }}>
+        <div className="portal-layout">
 
           {/* Columna principal */}
           <div style={{ flex:1, minWidth:0, background:"#faf8f3", border:"1px solid #e0d8ca", borderRadius:"20px", padding:"24px", boxShadow:"0 2px 12px rgba(26,18,8,0.07)" }}>
@@ -262,7 +262,7 @@ export default function PortalPage() {
           )}
 
           {/* Hero */}
-          <div style={{ background:"linear-gradient(135deg,#0a1a11 0%,#133320 100%)", borderRadius:"20px", padding:"28px 32px", marginBottom:"24px", display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:"20px", boxShadow:"0 8px 32px rgba(10,26,17,0.18)" }}>
+          <div className="portal-hero" style={{ background:"linear-gradient(135deg,#0a1a11 0%,#133320 100%)", borderRadius:"20px", padding:"28px 32px", marginBottom:"24px", gap:"20px", boxShadow:"0 8px 32px rgba(10,26,17,0.18)" }}>
             <div style={{ display:"flex", alignItems:"center", gap:"18px" }}>
               <div style={{ width:"56px", height:"56px", borderRadius:"50%", flexShrink:0, background:"rgba(196,140,52,0.18)", border:"2px solid rgba(196,140,52,0.4)", display:"flex", alignItems:"center", justifyContent:"center" }}>
                 <PawPrint size={26} color="#c48c34" />
@@ -289,7 +289,7 @@ export default function PortalPage() {
           </div>
 
           {/* Tabs */}
-          <div style={{ display:"flex", flexWrap:"wrap", gap:"2px", background:"#ede7d9", padding:"4px", borderRadius:"12px", width:"fit-content", marginBottom:"24px" }}>
+          <div className="portal-tabs" style={{ background:"#ede7d9", padding:"4px", borderRadius:"12px" }}>
             {tabBtn("mascotas",    "Mis mascotas",   <PawPrint size={14} />)}
             {tabBtn("citas",       "Mis citas",      <CalendarDays size={14} />)}
             {tabBtn("historial",   "Historial clínico", <FileText size={14} />)}
@@ -339,7 +339,7 @@ export default function PortalPage() {
                     ) : (
                       <>
                         {citas.map(c => (
-                          <div key={c.id_cita} style={{ background:"#fff", border:"1px solid #e8e0d0", borderRadius:"14px", padding:"18px 22px", display:"flex", alignItems:"center", justifyContent:"space-between", gap:"16px", flexWrap:"wrap" }}>
+                          <div key={c.id_cita} className="portal-cita-row" style={{ background:"#fff", border:"1px solid #e8e0d0", borderRadius:"14px", padding:"18px 22px" }}>
                             <div style={{ display:"flex", alignItems:"center", gap:"16px", minWidth:0 }}>
                               <div style={{ width:"46px", height:"46px", borderRadius:"12px", background:"linear-gradient(135deg,#fdf3dc,#fce8b0)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
                                 <CalendarDays size={20} color="#c48c34" />
@@ -429,7 +429,7 @@ export default function PortalPage() {
                           </div>
                           {h.peso_consulta && <span style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.78rem", fontWeight:600, color:"#3d845b", background:"#f0fdf4", padding:"4px 10px", borderRadius:"99px", whiteSpace:"nowrap" }}>{h.peso_consulta} kg</span>}
                         </div>
-                        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px" }}>
+                        <div className="portal-hist-grid">
                           {[["Diagnóstico", h.diagnostico], ["Tratamiento", h.tratamiento]].map(([l,v]) => (
                             <div key={l}>
                               <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.7rem", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.08em", color:"#8a7a60", margin:"0 0 3px" }}>{l}</p>
@@ -465,7 +465,7 @@ export default function PortalPage() {
           </div>{/* fin columna principal */}
 
           {/* ── Sidebar de alertas ── */}
-          <div style={{ width:"260px", flexShrink:0, position:"sticky", top:"88px" }}>
+          <div className="portal-sidebar">
             <p style={{ margin:"0 0 10px", fontFamily:"var(--font-dm-sans)", fontSize:"0.7rem", fontWeight:700, color:"#8a7a60", textTransform:"uppercase", letterSpacing:"0.09em" }}>
               Estado y avisos
             </p>

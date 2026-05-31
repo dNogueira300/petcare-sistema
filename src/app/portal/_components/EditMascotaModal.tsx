@@ -68,31 +68,43 @@ export function EditMascotaModal({ mascota, open, onClose, onSaved }: Props) {
           </div>
           <button onClick={onClose} style={{ background:"rgba(255,255,255,0.08)", border:"none", color:"rgba(255,255,255,0.6)", cursor:"pointer", width:"34px", height:"34px", borderRadius:"9px", display:"flex", alignItems:"center", justifyContent:"center" }}><X size={16} /></button>
         </div>
-        <div style={{ padding:"24px", overflowY:"auto" }}>
+        {/* Contenido scrollable */}
+        <div style={{ flex:1, minHeight:0, overflowY:"auto", padding:"24px" }}>
           {done ? (
             <div style={{ textAlign:"center", padding:"8px 0" }}>
               <div style={{ width:"64px", height:"64px", borderRadius:"50%", background:"linear-gradient(135deg,#f0fdf4,#dcfce7)", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px" }}><CheckCircle size={32} color="#16a34a" /></div>
               <p style={{ fontFamily:"var(--font-fraunces)", fontSize:"1.2rem", fontWeight:700, fontStyle:"italic", color:"#1a1208", margin:"0 0 8px" }}>¡Listo!</p>
-              <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.88rem", color:"#8a7a60", lineHeight:1.6, margin:"0 0 20px" }}>Los datos de {nombre} fueron actualizados.</p>
-              <button onClick={onClose} style={{ background:"#0a1a11", color:"#fff", border:"none", cursor:"pointer", padding:"12px 28px", borderRadius:"10px", fontFamily:"var(--font-dm-sans)", fontSize:"0.88rem", fontWeight:600 }}>Cerrar</button>
+              <p style={{ fontFamily:"var(--font-dm-sans)", fontSize:"0.88rem", color:"#8a7a60", lineHeight:1.6, margin:0 }}>Los datos de {nombre} fueron actualizados.</p>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} style={{ display:"flex", flexDirection:"column", gap:"14px" }}>
+            <form id="edit-mascota-form" onSubmit={handleSubmit} style={{ display:"flex", flexDirection:"column", gap:"14px" }}>
               <div><label style={labelS}>Nombre de la mascota</label><input value={nombre} onChange={e=>setNombre(e.target.value)} required style={inputS} /></div>
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px" }}>
+              <div className="portal-form-grid">
                 <div><label style={labelS}>Especie</label><select value={especie} onChange={e=>setEspecie(e.target.value)} style={inputS}>{ESPECIE_OPTS.map(o=><option key={o}>{o}</option>)}</select></div>
                 <div><label style={labelS}>Raza (opcional)</label><input value={raza} onChange={e=>setRaza(e.target.value)} style={inputS} /></div>
               </div>
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px" }}>
+              <div className="portal-form-grid">
                 <div><label style={labelS}>Sexo</label><select value={sexo} onChange={e=>setSexo(e.target.value)} style={inputS}><option value="macho">Macho</option><option value="hembra">Hembra</option></select></div>
                 <div><label style={labelS}>Color (opcional)</label><input value={color} onChange={e=>setColor(e.target.value)} style={inputS} /></div>
               </div>
               <div><label style={labelS}>Fecha de nacimiento (opcional)</label><input type="date" value={fechaNac} onChange={e=>setFechaNac(e.target.value)} style={inputS} /></div>
               {error && <p style={{ fontSize:"0.82rem", color:"#dc2626", fontFamily:"var(--font-dm-sans)" }}>{error}</p>}
-              <div style={{ position:"sticky", bottom:0, background:"#fff", borderTop:"1px solid #f0ead8", padding:"12px 0 4px", marginTop:"4px" }}>
-                <button type="submit" disabled={submitting} style={{ width:"100%", background:"linear-gradient(135deg,#0a1a11,#162e20)", color:"#fff", border:"none", cursor:submitting?"not-allowed":"pointer", padding:"13px", borderRadius:"12px", fontSize:"0.9rem", fontWeight:700, fontFamily:"var(--font-dm-sans)", opacity:submitting?0.7:1 }}>{submitting?"Guardando…":"Guardar cambios"}</button>
-              </div>
             </form>
+          )}
+        </div>
+
+        {/* Footer — botón siempre visible */}
+        <div style={{ flexShrink:0, borderTop:"1px solid #f0ead8", padding:"14px 24px 18px", background:"#fff" }}>
+          {done ? (
+            <button onClick={onClose}
+              style={{ width:"100%", background:"#0a1a11", color:"#fff", border:"none", cursor:"pointer", padding:"13px", borderRadius:"12px", fontSize:"0.9rem", fontWeight:700, fontFamily:"var(--font-dm-sans)" }}>
+              Cerrar
+            </button>
+          ) : (
+            <button type="submit" form="edit-mascota-form" disabled={submitting}
+              style={{ width:"100%", background:"linear-gradient(135deg,#0a1a11,#162e20)", color:"#fff", border:"none", cursor:submitting?"not-allowed":"pointer", padding:"13px", borderRadius:"12px", fontSize:"0.9rem", fontWeight:700, fontFamily:"var(--font-dm-sans)", opacity:submitting?0.7:1 }}>
+              {submitting?"Guardando…":"Guardar cambios"}
+            </button>
           )}
         </div>
       </div>

@@ -43,7 +43,7 @@ export function SeguimientosTab({ seguimientos, mascotas, loading, onAgendar }: 
         const vencido  = s.fecha_sugerida_control < hoy && ["pendiente","sugerencia_enviada"].includes(s.estado);
         const mascota  = mascotas.find(m => m.id_mascota === s.id_mascota);
         return (
-          <div key={s.id_seguimiento} style={{ background: vencido ? "rgba(254,242,242,0.5)" : "#fff", border: vencido ? "1.5px solid rgba(220,38,38,0.3)" : "1px solid #e8e0d0", borderRadius:"14px", padding:"18px 22px", display:"flex", alignItems:"center", justifyContent:"space-between", gap:"16px", flexWrap:"wrap" }}>
+          <div key={s.id_seguimiento} className="portal-cita-row" style={{ background: vencido ? "rgba(254,242,242,0.5)" : "#fff", border: vencido ? "1.5px solid rgba(220,38,38,0.3)" : "1px solid #e8e0d0", borderRadius:"14px", padding:"18px 22px" }}>
             <div style={{ display:"flex", alignItems:"center", gap:"14px", minWidth:0 }}>
               <div style={{ width:"44px", height:"44px", borderRadius:"12px", background: vencido ? "rgba(220,38,38,0.1)" : "rgba(217,119,6,0.1)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"1.4rem", flexShrink:0 }}>
                 {mascota ? (ESPECIE_ICONS[mascota.especie] ?? "🐾") : <Stethoscope size={18} color="#d97706" />}

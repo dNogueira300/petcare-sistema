@@ -104,7 +104,7 @@ export function AlertsSidebar({ alertasVac, seguimientos, atencionesActivas, col
                 <p style={{ margin:0, fontFamily:"var(--font-dm-sans)", fontSize:"0.8rem", fontWeight:600, color:"#111827" }}>
                   {s.mascotas?.nombre ?? "Mascota"}
                 </p>
-                <p style={{ margin:"1px 0 0", fontFamily:"var(--font-dm-sans)", fontSize:"0.7rem", color: vencido ? "#dc2626" : "#6b7280", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:160 }}>
+                <p style={{ margin:"1px 0 0", fontFamily:"var(--font-dm-sans)", fontSize:"0.7rem", color: vencido ? "#dc2626" : "#6b7280", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:"100%" }}>
                   {s.motivo_seguimiento}
                 </p>
                 <p style={{ margin:"1px 0 0", fontFamily:"var(--font-dm-sans)", fontSize:"0.68rem", color: vencido ? "#dc2626" : "#9ca3af", fontWeight: vencido ? 600 : 400 }}>
