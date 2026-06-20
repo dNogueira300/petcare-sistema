@@ -178,7 +178,7 @@ export function Navbar({ onMenuToggle, collapsed = false, onCollapse }: NavbarPr
               title={canSeeNotifs ? "Notificaciones" : undefined}
               style={{ padding: "7px", borderRadius: "8px", border: "none",
                 background: bellOpen ? "var(--card-border)" : "transparent",
-                color: notifs.length > 0 ? "#c48c34" : "#a89a80",
+                color: notifs.length > 0 ? "#c48c34" : "#7a6a50",
                 cursor: canSeeNotifs ? "pointer" : "default",
                 display: "flex", alignItems: "center", transition: "background 0.15s",
                 position: "relative" }}
@@ -219,7 +219,7 @@ export function Navbar({ onMenuToggle, collapsed = false, onCollapse }: NavbarPr
                   </div>
                   <button onClick={() => setBellOpen(false)}
                     style={{ background: "none", border: "none", cursor: "pointer",
-                      color: "#a89a80", display: "flex", padding: "2px" }}>
+                      color: "#7a6a50", display: "flex", padding: "2px" }}>
                     <X size={13} />
                   </button>
                 </div>
@@ -228,7 +228,7 @@ export function Navbar({ onMenuToggle, collapsed = false, onCollapse }: NavbarPr
                 <div style={{ maxHeight: "280px", overflowY: "auto" }}>
                   {notifs.length === 0 ? (
                     <div style={{ padding: "24px 16px", textAlign: "center",
-                      fontFamily: "var(--font-dm-sans)", fontSize: "0.82rem", color: "#a89a80" }}>
+                      fontFamily: "var(--font-dm-sans)", fontSize: "0.82rem", color: "#7a6a50" }}>
                       Sin citas nuevas pendientes
                     </div>
                   ) : notifs.map((n) => (
@@ -276,7 +276,7 @@ export function Navbar({ onMenuToggle, collapsed = false, onCollapse }: NavbarPr
                 lineHeight: 1.2, fontFamily: "var(--font-dm-sans)", margin: 0 }}>
                 {fullName || "—"}
               </p>
-              <p style={{ fontSize: "0.68rem", color: "#a89a80",
+              <p style={{ fontSize: "0.68rem", color: "#7a6a50",
                 fontFamily: "var(--font-dm-sans)", margin: 0 }}>
                 {user ? rolLabels[user.rol] : ""}
               </p>
@@ -287,10 +287,10 @@ export function Navbar({ onMenuToggle, collapsed = false, onCollapse }: NavbarPr
             onClick={() => setShowDialog(true)}
             title="Cerrar sesión"
             style={{ padding: "7px", borderRadius: "8px", border: "none", background: "transparent",
-              color: "#a89a80", cursor: "pointer", display: "flex", alignItems: "center",
+              color: "#7a6a50", cursor: "pointer", display: "flex", alignItems: "center",
               transition: "background 0.15s, color 0.15s", marginLeft: "2px" }}
             onMouseEnter={(e) => { const b = e.currentTarget as HTMLButtonElement; b.style.background = "#fff0f0"; b.style.color = "#dc2626"; }}
-            onMouseLeave={(e) => { const b = e.currentTarget as HTMLButtonElement; b.style.background = "transparent"; b.style.color = "#a89a80"; }}
+            onMouseLeave={(e) => { const b = e.currentTarget as HTMLButtonElement; b.style.background = "transparent"; b.style.color = "#7a6a50"; }}
           >
             <LogOut size={15} />
           </button>

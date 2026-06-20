@@ -76,7 +76,7 @@ function KpiCard({ label, value, icon:Icon, color, suffix="", sub }: { label:str
           {suffix && <span style={{ fontSize:"0.95rem", fontWeight:600, color, marginLeft:2 }}>{suffix}</span>}
         </p>
         <p style={{ margin:"3px 0 0", fontSize:"0.72rem", color:"#6b7280", fontFamily:FONT }}>{label}</p>
-        {sub && <p style={{ margin:"1px 0 0", fontSize:"0.68rem", color:"#9ca3af", fontFamily:FONT }}>{sub}</p>}
+        {sub && <p style={{ margin:"1px 0 0", fontSize:"0.68rem", color:"#6b7280", fontFamily:FONT }}>{sub}</p>}
       </div>
     </div>
   );
@@ -128,14 +128,14 @@ function ComparativaPanel({ vets }: { vets: VetOption[] }) {
 
   return (
     <div style={{ background:"#fff", border:"1px solid #e8f0eb", borderRadius:14, padding:"20px 22px" }}>
-      <h3 style={{ margin:"0 0 16px", fontSize:"0.85rem", fontWeight:700, color:"#374151", fontFamily:FONT }}>Comparativa mes a mes (Flujo B)</h3>
+      <h2 style={{ margin:"0 0 16px", fontSize:"0.85rem", fontWeight:700, color:"#374151", fontFamily:FONT }}>Comparativa mes a mes (Flujo B)</h2>
       <div style={{ display:"flex", gap:12, flexWrap:"wrap", marginBottom:14, alignItems:"flex-end" }}>
-        <div><label style={{ display:"block", fontSize:"0.7rem", fontWeight:700, color:"#6b7280", textTransform:"uppercase", letterSpacing:"0.06em", fontFamily:FONT, marginBottom:5 }}>Período A</label>
-          <input type="month" value={mesA} onChange={e=>setMesA(e.target.value)} style={{ height:36, borderRadius:8, border:"1.5px solid #d1d5db", padding:"0 10px", fontFamily:FONT, fontSize:"0.85rem", outline:"none" }} /></div>
-        <div><label style={{ display:"block", fontSize:"0.7rem", fontWeight:700, color:"#6b7280", textTransform:"uppercase", letterSpacing:"0.06em", fontFamily:FONT, marginBottom:5 }}>Período B</label>
-          <input type="month" value={mesB} onChange={e=>setMesB(e.target.value)} style={{ height:36, borderRadius:8, border:"1.5px solid #d1d5db", padding:"0 10px", fontFamily:FONT, fontSize:"0.85rem", outline:"none" }} /></div>
-        <div><label style={{ display:"block", fontSize:"0.7rem", fontWeight:700, color:"#6b7280", textTransform:"uppercase", letterSpacing:"0.06em", fontFamily:FONT, marginBottom:5 }}>Veterinario (opcional)</label>
-          <select value={idVet} onChange={e=>setIdVet(e.target.value)} style={{ height:36, borderRadius:8, border:"1.5px solid #d1d5db", padding:"0 10px", fontFamily:FONT, fontSize:"0.85rem", outline:"none", minWidth:160 }}>
+        <div><label htmlFor="cmp-mesA" style={{ display:"block", fontSize:"0.7rem", fontWeight:700, color:"#6b7280", textTransform:"uppercase", letterSpacing:"0.06em", fontFamily:FONT, marginBottom:5 }}>Período A</label>
+          <input id="cmp-mesA" type="month" value={mesA} onChange={e=>setMesA(e.target.value)} style={{ height:36, borderRadius:8, border:"1.5px solid #d1d5db", padding:"0 10px", fontFamily:FONT, fontSize:"0.85rem", outline:"none" }} /></div>
+        <div><label htmlFor="cmp-mesB" style={{ display:"block", fontSize:"0.7rem", fontWeight:700, color:"#6b7280", textTransform:"uppercase", letterSpacing:"0.06em", fontFamily:FONT, marginBottom:5 }}>Período B</label>
+          <input id="cmp-mesB" type="month" value={mesB} onChange={e=>setMesB(e.target.value)} style={{ height:36, borderRadius:8, border:"1.5px solid #d1d5db", padding:"0 10px", fontFamily:FONT, fontSize:"0.85rem", outline:"none" }} /></div>
+        <div><label htmlFor="cmp-vet" style={{ display:"block", fontSize:"0.7rem", fontWeight:700, color:"#6b7280", textTransform:"uppercase", letterSpacing:"0.06em", fontFamily:FONT, marginBottom:5 }}>Veterinario (opcional)</label>
+          <select id="cmp-vet" value={idVet} onChange={e=>setIdVet(e.target.value)} style={{ height:36, borderRadius:8, border:"1.5px solid #d1d5db", padding:"0 10px", fontFamily:FONT, fontSize:"0.85rem", outline:"none", minWidth:160 }}>
             <option value="">Todos</option>
             {vets.map(v=><option key={v.id_veterinario} value={v.id_veterinario}>{v.usuarios.nombre} {v.usuarios.apellido}</option>)}
           </select></div>
@@ -163,7 +163,7 @@ function ComparativaPanel({ vets }: { vets: VetOption[] }) {
                     <td style={{ padding:"8px 12px", fontSize:"0.88rem", fontWeight:700, color:"#2563eb", textAlign:"right" }}>{vA}</td>
                     <td style={{ padding:"8px 12px", fontSize:"0.88rem", fontWeight:700, color:"#7c3aed", textAlign:"right" }}>{vB}</td>
                     <td style={{ padding:"8px 12px", textAlign:"right" }}>
-                      <span style={{ fontSize:"0.82rem", fontWeight:700, color: delta>0?"#dc2626":delta<0?"#15803d":"#9ca3af" }}>
+                      <span style={{ fontSize:"0.82rem", fontWeight:700, color: delta>0?"#dc2626":delta<0?"#15803d":"#6b7280" }}>
                         {delta>0?"+":""}{delta}
                       </span>
                     </td>
@@ -369,7 +369,7 @@ export default function ReportesPage() {
         <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
           {/* Filtro + Exportar */}
           <div style={{ display:"flex", gap:10, alignItems:"center", flexWrap:"wrap" }}>
-            <select value={filterVet} onChange={e=>setFilterVet(e.target.value)}
+            <select value={filterVet} onChange={e=>setFilterVet(e.target.value)} aria-label="Filtrar por veterinario"
               style={{ height:36, borderRadius:8, border:"1.5px solid #d1d5db", padding:"0 10px", fontFamily:FONT, fontSize:"0.82rem", outline:"none" }}>
               <option value="">Todos los veterinarios</option>
               {vets.map(v=><option key={v.id_veterinario} value={v.id_veterinario}>{v.usuarios.nombre} {v.usuarios.apellido}</option>)}
@@ -432,20 +432,20 @@ export default function ReportesPage() {
           <div style={{ background:"#fff", border:"1px solid #e5e7eb", borderRadius:14, padding:"18px 20px" }}>
             <p style={{ margin:"0 0 12px", fontFamily:FONT, fontSize:"0.75rem", fontWeight:700, color:"#374151", textTransform:"uppercase", letterSpacing:"0.07em" }}>Filtros</p>
             <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))", gap:12, marginBottom:14 }}>
-              <div><label style={{ display:"block", fontFamily:FONT, fontSize:"0.7rem", fontWeight:700, color:"#6b7280", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:5 }}>Mascota</label>
-                <select value={audFiltros.id_mascota} onChange={e=>setAudFiltros(f=>({...f,id_mascota:e.target.value}))} style={{ width:"100%", height:36, borderRadius:8, border:"1.5px solid #d1d5db", padding:"0 10px", fontFamily:FONT, fontSize:"0.82rem", outline:"none" }}>
+              <div><label htmlFor="aud-mascota" style={{ display:"block", fontFamily:FONT, fontSize:"0.7rem", fontWeight:700, color:"#6b7280", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:5 }}>Mascota</label>
+                <select id="aud-mascota" value={audFiltros.id_mascota} onChange={e=>setAudFiltros(f=>({...f,id_mascota:e.target.value}))} style={{ width:"100%", height:36, borderRadius:8, border:"1.5px solid #d1d5db", padding:"0 10px", fontFamily:FONT, fontSize:"0.82rem", outline:"none" }}>
                   <option value="">Todas las mascotas</option>
                   {mascotas.map(m=><option key={m.id_mascota} value={m.id_mascota}>{m.nombre} ({m.especie})</option>)}
                 </select></div>
-              <div><label style={{ display:"block", fontFamily:FONT, fontSize:"0.7rem", fontWeight:700, color:"#6b7280", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:5 }}>Veterinario</label>
-                <select value={audFiltros.id_veterinario} onChange={e=>setAudFiltros(f=>({...f,id_veterinario:e.target.value}))} style={{ width:"100%", height:36, borderRadius:8, border:"1.5px solid #d1d5db", padding:"0 10px", fontFamily:FONT, fontSize:"0.82rem", outline:"none" }}>
+              <div><label htmlFor="aud-vet" style={{ display:"block", fontFamily:FONT, fontSize:"0.7rem", fontWeight:700, color:"#6b7280", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:5 }}>Veterinario</label>
+                <select id="aud-vet" value={audFiltros.id_veterinario} onChange={e=>setAudFiltros(f=>({...f,id_veterinario:e.target.value}))} style={{ width:"100%", height:36, borderRadius:8, border:"1.5px solid #d1d5db", padding:"0 10px", fontFamily:FONT, fontSize:"0.82rem", outline:"none" }}>
                   <option value="">Todos</option>
                   {vets.map(v=><option key={v.id_veterinario} value={v.id_veterinario}>{v.usuarios.nombre} {v.usuarios.apellido}</option>)}
                 </select></div>
-              <div><label style={{ display:"block", fontFamily:FONT, fontSize:"0.7rem", fontWeight:700, color:"#6b7280", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:5 }}>Desde</label>
-                <input type="date" value={audFiltros.desde} onChange={e=>setAudFiltros(f=>({...f,desde:e.target.value}))} style={{ width:"100%", height:36, borderRadius:8, border:"1.5px solid #d1d5db", padding:"0 10px", fontFamily:FONT, fontSize:"0.82rem", outline:"none", boxSizing:"border-box" }} /></div>
-              <div><label style={{ display:"block", fontFamily:FONT, fontSize:"0.7rem", fontWeight:700, color:"#6b7280", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:5 }}>Hasta</label>
-                <input type="date" value={audFiltros.hasta} onChange={e=>setAudFiltros(f=>({...f,hasta:e.target.value}))} style={{ width:"100%", height:36, borderRadius:8, border:"1.5px solid #d1d5db", padding:"0 10px", fontFamily:FONT, fontSize:"0.82rem", outline:"none", boxSizing:"border-box" }} /></div>
+              <div><label htmlFor="aud-desde" style={{ display:"block", fontFamily:FONT, fontSize:"0.7rem", fontWeight:700, color:"#6b7280", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:5 }}>Desde</label>
+                <input id="aud-desde" type="date" value={audFiltros.desde} onChange={e=>setAudFiltros(f=>({...f,desde:e.target.value}))} style={{ width:"100%", height:36, borderRadius:8, border:"1.5px solid #d1d5db", padding:"0 10px", fontFamily:FONT, fontSize:"0.82rem", outline:"none", boxSizing:"border-box" }} /></div>
+              <div><label htmlFor="aud-hasta" style={{ display:"block", fontFamily:FONT, fontSize:"0.7rem", fontWeight:700, color:"#6b7280", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:5 }}>Hasta</label>
+                <input id="aud-hasta" type="date" value={audFiltros.hasta} onChange={e=>setAudFiltros(f=>({...f,hasta:e.target.value}))} style={{ width:"100%", height:36, borderRadius:8, border:"1.5px solid #d1d5db", padding:"0 10px", fontFamily:FONT, fontSize:"0.82rem", outline:"none", boxSizing:"border-box" }} /></div>
             </div>
             <div style={{ display:"flex", gap:8, justifyContent:"flex-end" }}>
               {audBuscado && audData.length > 0 && (
@@ -466,10 +466,10 @@ export default function ReportesPage() {
                 <span style={{ fontFamily:FONT, fontSize:"0.78rem", fontWeight:700, color:"#374151" }}>
                   {audData.length === 0 ? "Sin resultados" : `${audData.length} registro${audData.length!==1?"s":""} encontrado${audData.length!==1?"s":""}`}
                 </span>
-                {audData.length>0 && <span style={{ fontFamily:FONT, fontSize:"0.72rem", color:"#9ca3af" }}>Más recientes primero</span>}
+                {audData.length>0 && <span style={{ fontFamily:FONT, fontSize:"0.72rem", color:"#6b7280" }}>Más recientes primero</span>}
               </div>
-              {audLoading ? <div style={{ padding:40, textAlign:"center", color:"#9ca3af", fontFamily:FONT }}>Cargando…</div>
-              : audData.length === 0 ? <div style={{ padding:40, textAlign:"center", color:"#9ca3af", fontFamily:FONT }}>No se encontraron registros con los filtros aplicados.</div>
+              {audLoading ? <div style={{ padding:40, textAlign:"center", color:"#6b7280", fontFamily:FONT }}>Cargando…</div>
+              : audData.length === 0 ? <div style={{ padding:40, textAlign:"center", color:"#6b7280", fontFamily:FONT }}>No se encontraron registros con los filtros aplicados.</div>
               : (
                 <div style={{ padding:"16px 18px", display:"flex", flexDirection:"column", gap:12 }}>
                   {audData.map((e,idx)=>{
@@ -497,7 +497,7 @@ export default function ReportesPage() {
                               </span>
                               {mascota && <span style={{ fontFamily:FONT, fontSize:"0.8rem", fontWeight:700, color:"#111827" }}>{mascota.nombre} <span style={{ fontWeight:400, color:"#6b7280", textTransform:"capitalize" }}>({mascota.especie})</span></span>}
                             </div>
-                            <span style={{ fontFamily:FONT, fontSize:"0.72rem", color:"#9ca3af", whiteSpace:"nowrap" }}>
+                            <span style={{ fontFamily:FONT, fontSize:"0.72rem", color:"#6b7280", whiteSpace:"nowrap" }}>
                               {new Date(e.timestamp_cambio).toLocaleString("es-PE",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"})}
                             </span>
                           </div>
