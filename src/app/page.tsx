@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import vetBg from "../../public/vet_bg.webp";
 import {
   PawPrint,
   Stethoscope,
@@ -399,13 +400,31 @@ function Hero({ onBook }: { onBook: () => void }) {
         alignItems: "center",
         justifyContent: "center",
         overflow: "hidden",
-        backgroundImage:
-          "linear-gradient(155deg, rgba(6,18,9,0.78) 0%, rgba(10,26,17,0.72) 40%, rgba(15,35,24,0.75) 100%), url('/vet_bg.png')",
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-        backgroundRepeat: "no-repeat",
       }}
     >
+      {/* LCP background — optimized & priority-loaded */}
+      <Image
+        src={vetBg}
+        alt=""
+        fill
+        priority
+        placeholder="blur"
+        sizes="100vw"
+        style={{ objectFit: "cover", objectPosition: "center", zIndex: 0 }}
+      />
+      {/* Gradient overlay (was part of the CSS background-image) */}
+      <div
+        aria-hidden
+        style={{
+          position: "absolute",
+          inset: 0,
+          zIndex: 0,
+          background:
+            "linear-gradient(155deg, rgba(6,18,9,0.78) 0%, rgba(10,26,17,0.72) 40%, rgba(15,35,24,0.75) 100%)",
+          pointerEvents: "none",
+        }}
+      />
+
       {/* Bokeh glow circles */}
       {[
         { w: 500, h: 500, t: "10%", l: "60%", c: "#3d845b" },
